@@ -15,35 +15,38 @@ public sealed class ProblemDetailsExceptionHandler : IExceptionHandler
         var code = "unexpected_error";
         var title = "An unexpected error occurred.";
 
-        if (exception is BadHttpRequestException)
+        switch (exception)
         {
-            status = StatusCodes.Status400BadRequest;
-            code = "malformed_input";
-            title = "The request is malformed.";
-        }
-        else if (exception is InvalidInput invalidInput)
-        {
-            status = StatusCodes.Status400BadRequest;
-            code = invalidInput.Code;
-            title = invalidInput.Message;
-        }
-        else if (exception is UnknownActor unknownActor)
-        {
-            status = StatusCodes.Status401Unauthorized;
-            code = unknownActor.Code;
-            title = unknownActor.Message;
-        }
-        else if (exception is ResourceNotFound resourceNotFound)
-        {
-            status = StatusCodes.Status404NotFound;
-            code = resourceNotFound.Code;
-            title = resourceNotFound.Message;
-        }
-        else if (exception is DomainException domainException)
-        {
-            status = StatusCodes.Status409Conflict;
-            code = domainException.Code;
-            title = domainException.Message;
+            case BadHttpRequestException:
+                status = StatusCodes.Status400BadRequest;
+                code = "malformed_input";
+                title = "The request is malformed.";
+                break;
+            case InvalidInput invalidInput:
+                status = StatusCodes.Status400BadRequest;
+                code = invalidInput.Code;
+                title = invalidInput.Message;
+                break;
+            case UnknownActor unknownActor:
+                status = StatusCodes.Status401Unauthorized;
+                code = unknownActor.Code;
+                title = unknownActor.Message;
+                break;
+            case ResourceNotFound resourceNotFound:
+                status = StatusCodes.Status404NotFound;
+                code = resourceNotFound.Code;
+                title = resourceNotFound.Message;
+                break;
+            case OnlyApproverCanApprove onlyApproverCanApprove:
+                status = StatusCodes.Status403Forbidden;
+                code = onlyApproverCanApprove.Code;
+                title = onlyApproverCanApprove.Message;
+                break;
+            case DomainException domainException:
+                status = StatusCodes.Status409Conflict;
+                code = domainException.Code;
+                title = domainException.Message;
+                break;
         }
 
         await Results.Problem(

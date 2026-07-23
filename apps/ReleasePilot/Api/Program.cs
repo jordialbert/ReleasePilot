@@ -37,6 +37,7 @@ builder.Services.AddSingleton<IPromotionRepository>(
 builder.Services.AddSingleton<IPromotionDetailsReader>(
     services => services.GetRequiredService<PostgreSqlPromotionRepository>());
 builder.Services.AddScoped<RequestPromotionCommandHandler>();
+builder.Services.AddScoped<ApprovePromotionCommandHandler>();
 builder.Services.AddScoped<GetPromotionDetailsQueryHandler>();
 builder.Services
     .AddHealthChecks()
