@@ -37,6 +37,6 @@ public sealed class StartDeploymentCommandHandler(
             throw new DeploymentUnavailable();
         }
 
-        await promotions.StartDeployment(promotion, cancellationToken);
+        await promotions.Update(promotion, cancellationToken);
     }
 }

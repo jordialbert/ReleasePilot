@@ -17,7 +17,7 @@ public sealed class Promotion
         RequestedBy = requestedBy;
         RequestedAt = requestedAt;
         Status = PromotionStatus.Requested;
-        RequestedEvent = new PromotionRequested(
+        UncommittedEvent = new PromotionRequested(
             new DomainEventId(Guid.CreateVersion7()),
             id,
             requestedAt,
@@ -52,9 +52,7 @@ public sealed class Promotion
     public PromotionStatus Status { get; private set; }
     public UserId RequestedBy { get; }
     public DateTimeOffset RequestedAt { get; }
-    public PromotionRequested? RequestedEvent { get; }
-    public PromotionApproved? ApprovedEvent { get; private set; }
-    public DeploymentStarted? StartedEvent { get; private set; }
+    public PromotionDomainEvent? UncommittedEvent { get; private set; }
 
     public static Promotion Request(
         PromotionId id,
@@ -118,7 +116,7 @@ public sealed class Promotion
         }
 
         Status = PromotionStatus.Approved;
-        ApprovedEvent = new PromotionApproved(
+        UncommittedEvent = new PromotionApproved(
             new DomainEventId(Guid.CreateVersion7()),
             Id,
             approvedAt,
@@ -133,7 +131,7 @@ public sealed class Promotion
         }
 
         Status = PromotionStatus.Deploying;
-        StartedEvent = new DeploymentStarted(
+        UncommittedEvent = new DeploymentStarted(
             new DomainEventId(Guid.CreateVersion7()),
             Id,
             startedAt,
