@@ -2,7 +2,7 @@
 
 **What to build:** A successful Deployment can complete, become the Application Version's Pipeline Position, and unlock exactly the next Environment in the fixed pipeline.
 
-**Blocked by:** 04 — Start an idempotent Deployment.
+**Blocked by:** 04.5 — Separate Promotion persistence responsibilities.
 
 **Status:** ready-for-agent
 

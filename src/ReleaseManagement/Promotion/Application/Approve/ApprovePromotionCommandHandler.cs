@@ -2,13 +2,15 @@ using ReleaseManagement.Domain;
 
 namespace ReleaseManagement.Application;
 
-public sealed class ApprovePromotionCommandHandler(IPromotionRepository promotions)
+public sealed class ApprovePromotionCommandHandler(
+    IUserRepository users,
+    IPromotionRepository promotions)
 {
     public async Task Handle(
         ApprovePromotionCommand command,
         CancellationToken cancellationToken)
     {
-        var actor = await promotions.FindActor(
+        var actor = await users.Find(
             new UserId(command.ActorId),
             cancellationToken);
         if (actor is null)

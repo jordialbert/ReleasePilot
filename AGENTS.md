@@ -41,3 +41,7 @@ apps/ReleasePilot/Api/
 ## Task Completion Requirements
 - Keep local verification focused on the files and packages changed. Run the smallest relevant test set; do not run the full workspace test suite as a routine completion step.
 - Backend changes must include and run focused tests for the changed behavior.
+
+## Git rules
+- Open PRs as ready for review unless explicitly asked otherwise.
+- Do not put all changes into a single commit, try to break down the changes into smaller, atomic commits.

@@ -7,4 +7,5 @@ public sealed record PromotionRequested(
     UserId ActorId,
     ApplicationId ApplicationId,
     ApplicationVersionId ApplicationVersionId,
-    DeploymentEnvironment TargetEnvironment);
+    DeploymentEnvironment TargetEnvironment)
+    : PromotionDomainEvent(Id, PromotionId, OccurredAt, ActorId);

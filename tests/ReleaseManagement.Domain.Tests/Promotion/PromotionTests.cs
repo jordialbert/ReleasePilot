@@ -35,9 +35,10 @@ public sealed class PromotionTests
 
         Assert.Equal(PromotionStatus.Requested, promotion.Status);
         Assert.Equal(DeploymentEnvironment.Dev, promotion.TargetEnvironment);
-        Assert.Equal(promotion.Id, promotion.RequestedEvent!.PromotionId);
-        Assert.Equal(Actor.Id, promotion.RequestedEvent.ActorId);
-        Assert.Equal(requestedAt, promotion.RequestedEvent.OccurredAt);
+        var domainEvent = Assert.IsType<PromotionRequested>(promotion.UncommittedEvent);
+        Assert.Equal(promotion.Id, domainEvent.PromotionId);
+        Assert.Equal(Actor.Id, domainEvent.ActorId);
+        Assert.Equal(requestedAt, domainEvent.OccurredAt);
     }
 
     [Theory]
@@ -88,9 +89,10 @@ public sealed class PromotionTests
         promotion.Approve(Approver, approvedAt);
 
         Assert.Equal(PromotionStatus.Approved, promotion.Status);
-        Assert.Equal(promotion.Id, promotion.ApprovedEvent!.PromotionId);
-        Assert.Equal(Approver.Id, promotion.ApprovedEvent.ActorId);
-        Assert.Equal(approvedAt, promotion.ApprovedEvent.OccurredAt);
+        var domainEvent = Assert.IsType<PromotionApproved>(promotion.UncommittedEvent);
+        Assert.Equal(promotion.Id, domainEvent.PromotionId);
+        Assert.Equal(Approver.Id, domainEvent.ActorId);
+        Assert.Equal(approvedAt, domainEvent.OccurredAt);
     }
 
     [Fact]
@@ -104,13 +106,14 @@ public sealed class PromotionTests
             false,
             Actor,
             DateTimeOffset.UtcNow);
+        var uncommittedEvent = promotion.UncommittedEvent;
 
         var exception = Assert.Throws<OnlyApproverCanApprove>(
             () => promotion.Approve(Actor, DateTimeOffset.UtcNow));
 
         Assert.Equal("only_approver_can_approve", exception.Code);
         Assert.Equal(PromotionStatus.Requested, promotion.Status);
-        Assert.Null(promotion.ApprovedEvent);
+        Assert.Same(uncommittedEvent, promotion.UncommittedEvent);
     }
 
     [Fact]
@@ -125,13 +128,13 @@ public sealed class PromotionTests
             Approver,
             DateTimeOffset.UtcNow);
         promotion.Approve(Approver, DateTimeOffset.UtcNow);
-        var approvedEvent = promotion.ApprovedEvent;
+        var uncommittedEvent = promotion.UncommittedEvent;
 
         var exception = Assert.Throws<InvalidPromotionTransition>(
             () => promotion.Approve(Approver, DateTimeOffset.UtcNow));
 
         Assert.Equal("invalid_promotion_transition", exception.Code);
-        Assert.Same(approvedEvent, promotion.ApprovedEvent);
+        Assert.Same(uncommittedEvent, promotion.UncommittedEvent);
     }
 
     [Fact]
@@ -151,9 +154,10 @@ public sealed class PromotionTests
         promotion.StartDeployment(Actor, startedAt);
 
         Assert.Equal(PromotionStatus.Deploying, promotion.Status);
-        Assert.Equal(promotion.Id, promotion.StartedEvent!.PromotionId);
-        Assert.Equal(Actor.Id, promotion.StartedEvent.ActorId);
-        Assert.Equal(startedAt, promotion.StartedEvent.OccurredAt);
+        var domainEvent = Assert.IsType<DeploymentStarted>(promotion.UncommittedEvent);
+        Assert.Equal(promotion.Id, domainEvent.PromotionId);
+        Assert.Equal(Actor.Id, domainEvent.ActorId);
+        Assert.Equal(startedAt, domainEvent.OccurredAt);
     }
 
     [Fact]
@@ -167,13 +171,14 @@ public sealed class PromotionTests
             false,
             Actor,
             DateTimeOffset.UtcNow);
+        var uncommittedEvent = promotion.UncommittedEvent;
 
         var exception = Assert.Throws<InvalidPromotionTransition>(
             () => promotion.StartDeployment(Actor, DateTimeOffset.UtcNow));
 
         Assert.Equal("invalid_promotion_transition", exception.Code);
         Assert.Equal(PromotionStatus.Requested, promotion.Status);
-        Assert.Null(promotion.StartedEvent);
+        Assert.Same(uncommittedEvent, promotion.UncommittedEvent);
     }
 
 }

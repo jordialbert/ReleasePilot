@@ -4,4 +4,5 @@ public sealed record PromotionApproved(
     DomainEventId Id,
     PromotionId PromotionId,
     DateTimeOffset OccurredAt,
-    UserId ActorId);
+    UserId ActorId)
+    : PromotionDomainEvent(Id, PromotionId, OccurredAt, ActorId);

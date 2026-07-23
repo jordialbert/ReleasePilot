@@ -3,6 +3,8 @@ using ReleaseManagement.Domain;
 namespace ReleaseManagement.Application;
 
 public sealed class RequestPromotionCommandHandler(
+    IUserRepository users,
+    IApplicationVersionRepository versions,
     IPromotionRepository promotions,
     IPromotionDetailsReader details)
 {
@@ -18,7 +20,7 @@ public sealed class RequestPromotionCommandHandler(
             _ => throw new InvalidInput("targetEnvironment")
         };
 
-        var actor = await promotions.FindActor(
+        var actor = await users.Find(
             new UserId(command.ActorId),
             cancellationToken);
         if (actor is null)
@@ -27,7 +29,7 @@ public sealed class RequestPromotionCommandHandler(
         }
 
         var versionId = new ApplicationVersionId(command.ApplicationVersionId);
-        var version = await promotions.FindApplicationVersion(versionId, cancellationToken);
+        var version = await versions.Find(versionId, cancellationToken);
         if (version is null)
         {
             throw new ResourceNotFound("application_version");
