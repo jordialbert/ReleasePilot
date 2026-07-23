@@ -31,7 +31,7 @@ public sealed class StartDeploymentCommandHandler(
         {
             await deployment.Start(promotion.Id, cancellationToken);
         }
-        catch (Exception)
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
             throw new DeploymentUnavailable();
         }

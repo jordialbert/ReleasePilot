@@ -239,7 +239,7 @@ public sealed class RequestPromotionTests : IAsyncLifetime
         deployment.Unavailable = true;
 
         var unavailable = await client.PostAsync(
-            $"/promotions/{promotionId}/start",
+            $"/promotions/{promotionId}/start-deployment",
             null);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, unavailable.StatusCode);
@@ -256,7 +256,7 @@ public sealed class RequestPromotionTests : IAsyncLifetime
 
         deployment.Unavailable = false;
         var started = await client.PostAsync(
-            $"/promotions/{promotionId}/start",
+            $"/promotions/{promotionId}/start-deployment",
             null);
 
         Assert.Equal(HttpStatusCode.NoContent, started.StatusCode);
@@ -274,7 +274,7 @@ public sealed class RequestPromotionTests : IAsyncLifetime
         Assert.Single(deployment.Requests);
 
         var invalidTransition = await client.PostAsync(
-            $"/promotions/{promotionId}/start",
+            $"/promotions/{promotionId}/start-deployment",
             null);
         Assert.Equal(HttpStatusCode.Conflict, invalidTransition.StatusCode);
         Assert.Equal(

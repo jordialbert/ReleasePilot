@@ -82,7 +82,7 @@ public sealed class PromotionsController(
         return NoContent();
     }
 
-    [HttpPost("{id}/start")]
+    [HttpPost("{id}/start-deployment")]
     public async Task<IActionResult> StartDeployment(
         string id,
         [FromHeader(Name = "X-User-Id")] string? actorHeader,
