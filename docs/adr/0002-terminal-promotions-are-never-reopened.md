@@ -1,0 +1,5 @@
+# Terminal Promotions are never reopened
+
+A Promotion follows `Requested → Approved → Deploying → Completed`, may be cancelled before deployment starts, and may be rolled back only while deploying. Completed, Cancelled, and RolledBack Promotions are immutable. A cancelled or rolled-back attempt does not erase earlier successful environments; retrying it requires a new Promotion with a new identity targeting the same Environment. A completed environment cannot be promoted to again; the version may only advance to the next Environment.
+
+A known consequence is that once a bad version completes an Environment, no command restores the previously deployed version: rollback is only valid while Deploying and `EnvironmentAlreadyCompleted` blocks re-promoting an earlier version. This is a deliberate scope cut; the planned evolution is a dedicated `RedeployVersion` command that creates a new Promotion exempt from `EnvironmentAlreadyCompleted`, allowing a previously completed version to be deployed to that Environment again.
