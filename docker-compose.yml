@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:18.4
+    environment:
+      POSTGRES_DB: releasepilot
+      POSTGRES_USER: releasepilot
+      POSTGRES_PASSWORD: releasepilot
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./database:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready --username releasepilot --dbname releasepilot && psql --username releasepilot --dbname releasepilot --tuples-only --no-align --command "SELECT to_regclass('public.application_versions') IS NOT NULL" | grep --quiet "^t$"
+      interval: 2s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      args:
+        APP_PROJECT: apps/ReleasePilot/Api/ReleasePilot.Api.csproj
+        APP_DLL: ReleasePilot.Api.dll
+    environment:
+      ConnectionStrings__PostgreSQL: Host=db;Port=5432;Database=releasepilot;Username=releasepilot;Password=releasepilot;GSS Encryption Mode=Disable
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      args:
+        APP_PROJECT: apps/ReleasePilot/Worker/ReleasePilot.Worker.csproj
+        APP_DLL: ReleasePilot.Worker.dll
+    environment:
+      ConnectionStrings__PostgreSQL: Host=db;Port=5432;Database=releasepilot;Username=releasepilot;Password=releasepilot;GSS Encryption Mode=Disable
+    depends_on:
+      db:
+        condition: service_healthy
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

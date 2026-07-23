@@ -1,6 +1,6 @@
 # 03 — Approve a Promotion
 
-**What to build:** An Approver can authorize a Requested Promotion, including one they requested themselves, while other actors receive controlled errors.
+**What to build:** An Approver can authorize a Requested Promotion, including one they requested themselves, while Operators receive controlled errors.
 
 **Blocked by:** 02 — Request and inspect a Promotion.
 
@@ -17,7 +17,7 @@
 - [ ] A known Approver can move a Requested Promotion to Approved through the public command endpoint.
 - [ ] Self-approval is allowed.
 - [ ] Approval records exactly one `PromotionApproved` event in the same transaction as the updated snapshot.
-- [ ] A known non-Approver receives `403 Forbidden` with the stable approval authorization code.
+- [ ] A known Operator receives `403 Forbidden` with the stable approval authorization code.
 - [ ] Approval from any state other than Requested produces the appropriate controlled Domain conflict.
 - [ ] Successful transition commands return `204 No Content`.
 - [ ] Promotion details show the Approved snapshot and ordered approval history.

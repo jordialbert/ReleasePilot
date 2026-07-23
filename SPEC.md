@@ -27,7 +27,7 @@ The platform will expose canonical Promotion details, Application status across 
 11. As a release manager, I want concurrent requests for the same active target to produce one winner and one controlled conflict, so that race conditions cannot violate release policy.
 12. As an Approver, I want to approve a Requested Promotion, so that its Deployment can be authorized.
 13. As an Approver, I want to approve my own Promotion request, so that small teams are not blocked by a separation-of-duties rule that is outside this scope.
-14. As a known non-Approver, I want an approval attempt to be rejected clearly, so that authorization policy is explicit.
+14. As an Operator, I want an approval attempt to be rejected clearly, so that authorization policy is explicit.
 15. As a release manager, I want an Approved Promotion to start Deployment, so that the external Deployment system receives the authorized request.
 16. As a release manager, I want a Deployment request to use the Promotion ID as its idempotency key, so that retrying after an uncertain response is safe.
 17. As a release manager, I want a failed Deployment invocation to leave the stored Promotion Approved, so that external failure does not record a Deployment that was never reliably started.
@@ -99,7 +99,7 @@ The platform will expose canonical Promotion details, Application status across 
 - The fixed Environment Pipeline is `dev → staging → production`. The first target is dev, later targets must immediately follow the last completed Environment, completed Environments cannot be targeted again, and production completion ends progression.
 - Only one Active Promotion may exist for an Application and target Environment across every version of that Application. Requested, Approved, and Deploying are active.
 - The requesting use case loads contextual facts, while the Promotion factory makes progression and active-target decisions. A partial unique database index closes the concurrent-request race.
-- Any known seeded user may request, start, complete, roll back, or cancel. Only an Approver may approve, and self-approval is allowed.
+- Seeded users have either the Operator or Approver role. Any known seeded user may request, start, complete, roll back, or cancel. Only an Approver may approve, and self-approval is allowed.
 - The Domain uses typed IDs for Promotions, Applications, Application Versions, users, and Domain Events. IDs wrap UUIDv7 values created by the application.
 - Application Version labels are validated as non-empty opaque strings and are not parsed as semantic versions.
 - Deployment Environment, Promotion Status, and User Role are typed in the Domain and persisted as checked text values.
