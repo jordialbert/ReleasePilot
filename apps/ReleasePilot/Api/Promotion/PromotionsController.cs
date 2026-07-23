@@ -8,6 +8,7 @@ namespace ReleasePilot.Api.Promotion;
 public sealed class PromotionsController(
     RequestPromotionCommandHandler requestPromotion,
     ApprovePromotionCommandHandler approvePromotion,
+    StartDeploymentCommandHandler startDeployment,
     GetPromotionDetailsQueryHandler getPromotionDetails) : ControllerBase
 {
     [HttpPost]
@@ -77,6 +78,40 @@ public sealed class PromotionsController(
 
         await approvePromotion.Handle(
             new ApprovePromotionCommand(promotionId, actorId),
+            cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("{id}/start")]
+    public async Task<IActionResult> StartDeployment(
+        string id,
+        [FromHeader(Name = "X-User-Id")] string? actorHeader,
+        CancellationToken cancellationToken)
+    {
+        if (actorHeader is null)
+        {
+            var problem = new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "The X-User-Id header is required."
+            };
+            problem.Extensions["code"] = "missing_actor";
+            problem.Extensions["traceId"] = HttpContext.TraceIdentifier;
+            return Unauthorized(problem);
+        }
+
+        if (!Guid.TryParse(actorHeader, out var actorId))
+        {
+            throw new InvalidInput("X-User-Id");
+        }
+
+        if (!Guid.TryParse(id, out var promotionId))
+        {
+            throw new InvalidInput("id");
+        }
+
+        await startDeployment.Handle(
+            new StartDeploymentCommand(promotionId, actorId),
             cancellationToken);
         return NoContent();
     }

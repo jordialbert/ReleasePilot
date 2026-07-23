@@ -259,7 +259,6 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
                 throw new InvalidPromotionTransition();
             }
         }
-
         var domainEvent = promotion.ApprovedEvent!;
         await using (var command = new NpgsqlCommand(
             """
@@ -284,6 +283,63 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
             VALUES
                 ($1, 'audit', $2),
                 ($1, 'release_notes', $2)
+            """,
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue(domainEvent.Id.Value);
+            command.Parameters.AddWithValue(domainEvent.OccurredAt);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task StartDeployment(
+        Promotion promotion,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using (var command = new NpgsqlCommand(
+            """
+            UPDATE promotions
+            SET status = 'deploying'
+            WHERE id = $1 AND status = 'approved'
+            """,
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue(promotion.Id.Value);
+            if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
+            {
+                throw new InvalidPromotionTransition();
+            }
+        }
+
+        var domainEvent = promotion.StartedEvent!;
+        await using (var command = new NpgsqlCommand(
+            """
+            INSERT INTO domain_events (
+                id, promotion_id, type, occurred_at, actor_id, payload
+            )
+            VALUES ($1, $2, 'deployment_started', $3, $4, '{}')
+            """,
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue(domainEvent.Id.Value);
+            command.Parameters.AddWithValue(domainEvent.PromotionId.Value);
+            command.Parameters.AddWithValue(domainEvent.OccurredAt);
+            command.Parameters.AddWithValue(domainEvent.ActorId.Value);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var command = new NpgsqlCommand(
+            """
+            INSERT INTO event_deliveries (event_id, consumer, available_at)
+            VALUES ($1, 'audit', $2)
             """,
             connection,
             transaction))

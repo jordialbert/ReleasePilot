@@ -54,6 +54,7 @@ public sealed class Promotion
     public DateTimeOffset RequestedAt { get; }
     public PromotionRequested? RequestedEvent { get; }
     public PromotionApproved? ApprovedEvent { get; private set; }
+    public DeploymentStarted? StartedEvent { get; private set; }
 
     public static Promotion Request(
         PromotionId id,
@@ -121,6 +122,21 @@ public sealed class Promotion
             new DomainEventId(Guid.CreateVersion7()),
             Id,
             approvedAt,
+            actor.Id);
+    }
+
+    public void StartDeployment(Actor actor, DateTimeOffset startedAt)
+    {
+        if (Status != PromotionStatus.Approved)
+        {
+            throw new InvalidPromotionTransition();
+        }
+
+        Status = PromotionStatus.Deploying;
+        StartedEvent = new DeploymentStarted(
+            new DomainEventId(Guid.CreateVersion7()),
+            Id,
+            startedAt,
             actor.Id);
     }
 }
