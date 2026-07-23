@@ -90,8 +90,12 @@ The platform will expose canonical Promotion details, Application status across 
 ## Implementation Decisions
 
 - Release Management is the only bounded context. ReleasePilot is the product and executable grouping.
-- The solution will use .NET 10 and PostgreSQL 18, with separate API and worker executables sharing Domain, Application, and Infrastructure projects.
-- The Domain has no project dependencies. Application depends on Domain; Infrastructure depends on Application and Domain; the API and worker depend on Application and Infrastructure.
+- The solution will use .NET 10 and PostgreSQL 18, with separate API and worker executables sharing one Release Management bounded-context project.
+- Business modules live directly under `src/ReleaseManagement` and compile through `src/ReleaseManagement/ReleaseManagement.csproj`; no `Modules` or `Contexts` parent and no separate layer projects are introduced.
+- Each business module owns its Domain, Application, and Infrastructure directories and creates only the roles it needs. Empty placeholder directories are removed.
+- Each top-level class, record, enum, interface, or struct has a matching file.
+- Public HTTP routes are separate attribute-routed controller actions grouped in topic controllers under `apps/ReleasePilot/Api`. `Program.cs` contains registration and middleware only, with no minimal-API application routes.
+- Tests are grouped by the same business topic as production code.
 - Commands and queries follow `controller → concrete handler → named use case`. Handlers remain thin, use cases own orchestration, and query use cases map Domain objects to Application responses.
 - No MediatR dependency, custom command bus, custom query bus, generic handler abstraction, or generic repository will be introduced.
 - The Promotion lifecycle is `Requested → Approved → Deploying → Completed`, with cancellation allowed from Requested or Approved and rollback allowed only from Deploying.
@@ -131,7 +135,7 @@ The platform will expose canonical Promotion details, Application status across 
 - Application status always includes dev, staging, and production, distinguishing a currently deployed version from an Active Promotion.
 - Promotion history uses one-based page-number pagination, caps page size at 100, reports total count, and orders by request time descending then ID descending.
 - Errors use Problem Details with stable `code` and `traceId` values. Public statuses distinguish malformed input, unauthenticated actors, forbidden approval, missing resources, Domain or concurrency conflicts, Deployment unavailability, and unexpected failure.
-- Swagger UI is enabled in every environment.
+- Swagger UI is enabled at `/docs` in every environment.
 - The Release Notes consumer runs a generic tool-calling loop that validates calls, executes them, appends results to the conversation, and continues until draft submission succeeds.
 - Agent tools retrieve linked Work Items, ask for clarification, flag a Breaking Change in run-local structured state, and submit the Release Notes Draft.
 - Unknown tools, invalid arguments, reaching completion without submission, or exceeding ten model turns fail the delivery and use the normal retry policy.

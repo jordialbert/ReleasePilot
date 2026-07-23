@@ -1,9 +1,7 @@
 <Solution>
   <Project Path="apps/ReleasePilot/Api/ReleasePilot.Api.csproj" />
   <Project Path="apps/ReleasePilot/Worker/ReleasePilot.Worker.csproj" />
-  <Project Path="src/ReleaseManagement/Application/ReleaseManagement.Application.csproj" />
-  <Project Path="src/ReleaseManagement/Domain/ReleaseManagement.Domain.csproj" />
-  <Project Path="src/ReleaseManagement/Infrastructure/ReleaseManagement.Infrastructure.csproj" />
+  <Project Path="src/ReleaseManagement/ReleaseManagement.csproj" />
   <Project Path="tests/ReleaseManagement.Domain.Tests/ReleaseManagement.Domain.Tests.csproj" />
   <Project Path="tests/ReleasePilot.EndToEndTests/ReleasePilot.EndToEndTests.csproj" />
   <Project Path="tests/ReleasePilot.IntegrationTests/ReleasePilot.IntegrationTests.csproj" />

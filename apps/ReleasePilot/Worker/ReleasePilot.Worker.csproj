@@ -12,7 +12,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\ReleaseManagement\Application\ReleaseManagement.Application.csproj" />
-    <ProjectReference Include="..\..\..\src\ReleaseManagement\Infrastructure\ReleaseManagement.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\ReleaseManagement\ReleaseManagement.csproj" />
   </ItemGroup>
 </Project>
