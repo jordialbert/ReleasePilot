@@ -20,9 +20,9 @@ public sealed class ListPromotionsQueryHandler(
             throw new InvalidInput("pageSize");
         }
 
-        if (!await applications.Exists(
+        if (await applications.Find(
                 new ReleaseManagement.Domain.ApplicationId(query.ApplicationId),
-                cancellationToken))
+                cancellationToken) is null)
         {
             throw new ResourceNotFound("application");
         }
