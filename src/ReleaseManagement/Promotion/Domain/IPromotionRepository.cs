@@ -16,4 +16,5 @@ public interface IPromotionRepository
     Task<Promotion?> Find(PromotionId id, CancellationToken cancellationToken);
     Task Add(Promotion promotion, CancellationToken cancellationToken);
     Task Update(Promotion promotion, CancellationToken cancellationToken);
+    Task StartDeployment(Promotion promotion, CancellationToken cancellationToken);
 }

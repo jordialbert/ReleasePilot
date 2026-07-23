@@ -37,6 +37,11 @@ public sealed class ProblemDetailsExceptionHandler : IExceptionHandler
                 code = resourceNotFound.Code;
                 title = resourceNotFound.Message;
                 break;
+            case DeploymentUnavailable deploymentUnavailable:
+                status = StatusCodes.Status503ServiceUnavailable;
+                code = deploymentUnavailable.Code;
+                title = deploymentUnavailable.Message;
+                break;
             case OnlyApproverCanApprove onlyApproverCanApprove:
                 status = StatusCodes.Status403Forbidden;
                 code = onlyApproverCanApprove.Code;

@@ -134,4 +134,46 @@ public sealed class PromotionTests
         Assert.Same(approvedEvent, promotion.ApprovedEvent);
     }
 
+    [Fact]
+    public void StartsApprovedPromotionAndRecordsItsEvent()
+    {
+        var startedAt = DateTimeOffset.Parse("2026-07-23T12:10:00Z");
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            false,
+            Approver,
+            DateTimeOffset.Parse("2026-07-23T12:00:00Z"));
+        promotion.Approve(Approver, DateTimeOffset.Parse("2026-07-23T12:05:00Z"));
+
+        promotion.StartDeployment(Actor, startedAt);
+
+        Assert.Equal(PromotionStatus.Deploying, promotion.Status);
+        Assert.Equal(promotion.Id, promotion.StartedEvent!.PromotionId);
+        Assert.Equal(Actor.Id, promotion.StartedEvent.ActorId);
+        Assert.Equal(startedAt, promotion.StartedEvent.OccurredAt);
+    }
+
+    [Fact]
+    public void RequestedPromotionCannotStartDeployment()
+    {
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            false,
+            Actor,
+            DateTimeOffset.UtcNow);
+
+        var exception = Assert.Throws<InvalidPromotionTransition>(
+            () => promotion.StartDeployment(Actor, DateTimeOffset.UtcNow));
+
+        Assert.Equal("invalid_promotion_transition", exception.Code);
+        Assert.Equal(PromotionStatus.Requested, promotion.Status);
+        Assert.Null(promotion.StartedEvent);
+    }
+
 }

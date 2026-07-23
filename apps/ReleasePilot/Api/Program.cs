@@ -36,8 +36,12 @@ builder.Services.AddSingleton<IPromotionRepository>(
     services => services.GetRequiredService<PostgreSqlPromotionRepository>());
 builder.Services.AddSingleton<IPromotionDetailsReader>(
     services => services.GetRequiredService<PostgreSqlPromotionRepository>());
+builder.Services.AddSingleton<InMemoryDeploymentPort>();
+builder.Services.AddSingleton<IDeploymentPort>(
+    services => services.GetRequiredService<InMemoryDeploymentPort>());
 builder.Services.AddScoped<RequestPromotionCommandHandler>();
 builder.Services.AddScoped<ApprovePromotionCommandHandler>();
+builder.Services.AddScoped<StartDeploymentCommandHandler>();
 builder.Services.AddScoped<GetPromotionDetailsQueryHandler>();
 builder.Services
     .AddHealthChecks()
