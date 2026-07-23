@@ -138,7 +138,7 @@ The use case loads these contextual facts, but `Promotion.Request` decides wheth
 
 ### Authorization
 
-Any known seeded user may request, start, complete, roll back, or cancel. Only a user with the Approver role may approve. An Approver may approve their own request.
+Seeded users have either the Operator or Approver role. Any known seeded user may request, start, complete, roll back, or cancel. Only an Approver may approve. An Approver may approve their own request.
 
 ### Typed values
 
@@ -445,7 +445,7 @@ Responses use Problem Details plus stable `code` and `traceId` fields:
 ```text
 400  malformed input or unknown value
 401  missing or unknown acting user
-403  known non-Approver attempts approval
+403  known Operator attempts approval
 404  missing resource
 409  Domain invariant or concurrency conflict
 503  unavailable external deployment system

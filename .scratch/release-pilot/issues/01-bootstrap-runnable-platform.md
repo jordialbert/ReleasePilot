@@ -16,7 +16,7 @@
 4. `deploy: run ReleasePilot with Docker Compose`
 
 - [ ] The solution contains separate Domain, Application, Infrastructure, API, worker, and test projects with the agreed dependency direction.
-- [ ] Fixed users, Applications, and Application Versions are initialized through PostgreSQL schema and seed scripts rather than runtime schema creation.
+- [ ] Fixed Operator and Approver users, Applications, and Application Versions are initialized through PostgreSQL schema and seed scripts rather than runtime schema creation.
 - [ ] One cache-efficient multi-stage Dockerfile builds either the API or worker from a build argument and runs as the official non-root application user.
 - [ ] Docker Compose starts PostgreSQL 18, the API, and the worker with final health dependencies, restart policy, ports, and persistent database volume.
 - [ ] The API exposes Swagger and a health endpoint that checks PostgreSQL connectivity and schema initialization.

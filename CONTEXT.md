@@ -41,6 +41,9 @@ _Avoid_: Promotion
 **Approver**:
 An actor authorized to approve a Promotion.
 
+**Operator**:
+An actor authorized to manage Promotions except for approval.
+
 **Work Item**:
 A tracked change linked to an Application Version and used as source material for release notes.
 _Avoid_: Issue, ticket
