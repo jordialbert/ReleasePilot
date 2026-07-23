@@ -5,7 +5,7 @@ using Npgsql;
 
 namespace ReleasePilot.IntegrationTests;
 
-public sealed class PromotionHistoryTests : PromotionIntegrationTest
+public sealed class PromotionListTests : PromotionIntegrationTest
 {
     [Fact]
     public async Task ListsEmptyAndSinglePageHistory()

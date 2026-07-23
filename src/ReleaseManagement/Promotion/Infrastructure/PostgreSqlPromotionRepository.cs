@@ -7,7 +7,7 @@ using ReleaseManagement.Domain;
 namespace ReleaseManagement.Infrastructure;
 
 public sealed class PostgreSqlPromotionRepository(string connectionString)
-    : IPromotionRepository, IPromotionDetailsReader, IPromotionHistoryReader
+    : IPromotionRepository, IPromotionDetailsReader
 {
     public async Task<DeploymentEnvironment?> FindLastCompletedEnvironment(
         ApplicationVersionId id,
@@ -293,75 +293,4 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
             history,
             releaseNotesDraft);
     }
-
-    public async Task<PromotionHistoryPageResponse?> List(
-        Guid applicationId,
-        int page,
-        int pageSize,
-        CancellationToken cancellationToken)
-    {
-        await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-        long totalCount;
-        await using (var countCommand = new NpgsqlCommand(
-            """
-            SELECT EXISTS (SELECT 1 FROM applications WHERE id = $1),
-                   count(*)
-            FROM promotions
-            WHERE application_id = $1
-            """,
-            connection))
-        {
-            countCommand.Parameters.AddWithValue(applicationId);
-            await using var countReader =
-                await countCommand.ExecuteReaderAsync(cancellationToken);
-            await countReader.ReadAsync(cancellationToken);
-            if (!countReader.GetBoolean(0))
-            {
-                return null;
-            }
-
-            totalCount = countReader.GetInt64(1);
-        }
-
-        var items = new List<PromotionSummaryResponse>();
-        await using var command = new NpgsqlCommand(
-            """
-            SELECT p.id, p.application_id, p.application_version_id, av.label,
-                   p.target_environment, p.status, p.requested_by,
-                   p.requested_at, p.completed_at
-            FROM promotions p
-            JOIN application_versions av ON av.id = p.application_version_id
-            WHERE p.application_id = $1
-            ORDER BY p.requested_at DESC, p.id DESC
-            LIMIT $2 OFFSET $3
-            """,
-            connection);
-        command.Parameters.AddWithValue(applicationId);
-        command.Parameters.AddWithValue(pageSize);
-        command.Parameters.AddWithValue(((long)page - 1) * pageSize);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            DateTimeOffset? completedAt = null;
-            if (!reader.IsDBNull(8))
-            {
-                completedAt = reader.GetFieldValue<DateTimeOffset>(8);
-            }
-
-            items.Add(new PromotionSummaryResponse(
-                reader.GetGuid(0),
-                reader.GetGuid(1),
-                reader.GetGuid(2),
-                reader.GetString(3),
-                reader.GetString(4),
-                reader.GetString(5),
-                reader.GetGuid(6),
-                reader.GetFieldValue<DateTimeOffset>(7),
-                completedAt));
-        }
-
-        return new PromotionHistoryPageResponse(items, page, pageSize, totalCount);
-    }
-
 }

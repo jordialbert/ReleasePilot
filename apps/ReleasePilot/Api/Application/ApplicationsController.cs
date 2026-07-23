@@ -6,10 +6,10 @@ namespace ReleasePilot.Api.Application;
 [ApiController]
 [Route("applications")]
 public sealed class ApplicationsController(
-    ListPromotionHistoryQueryHandler listPromotionHistory) : ControllerBase
+    ListPromotionsQueryHandler listPromotions) : ControllerBase
 {
     [HttpGet("{id}/promotions")]
-    public async Task<ActionResult<PromotionHistoryPageResponse>> ListPromotionHistory(
+    public async Task<ActionResult<PromotionListPageResponse>> ListPromotions(
         string id,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
@@ -20,10 +20,11 @@ public sealed class ApplicationsController(
             throw new InvalidInput("id");
         }
 
-        return await listPromotionHistory.Handle(
-            applicationId,
-            page,
-            pageSize,
+        return await listPromotions.Handle(
+            new ListPromotionsQuery(
+                applicationId,
+                Page: page,
+                PageSize: pageSize),
             cancellationToken);
     }
 }

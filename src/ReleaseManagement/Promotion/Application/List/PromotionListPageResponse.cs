@@ -1,6 +1,6 @@
 namespace ReleaseManagement.Application;
 
-public sealed record PromotionHistoryPageResponse(
+public sealed record PromotionListPageResponse(
     IReadOnlyList<PromotionSummaryResponse> Items,
     int Page,
     int PageSize,
