@@ -13,6 +13,8 @@ public sealed class ApplicationsController(
         string id,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] DateTimeOffset? snapshotRequestedAt = null,
+        [FromQuery] Guid? snapshotPromotionId = null,
         CancellationToken cancellationToken = default)
     {
         if (!Guid.TryParse(id, out var applicationId))
@@ -20,11 +22,24 @@ public sealed class ApplicationsController(
             throw new InvalidInput("id");
         }
 
+        if (snapshotRequestedAt.HasValue != snapshotPromotionId.HasValue)
+        {
+            throw new InvalidInput("snapshot");
+        }
+
+        PromotionListSnapshot? snapshot = null;
+        if (snapshotRequestedAt is { } requestedAt
+            && snapshotPromotionId is { } promotionId)
+        {
+            snapshot = new PromotionListSnapshot(requestedAt, promotionId);
+        }
+
         return await listPromotions.Handle(
             new ListPromotionsQuery(
                 applicationId,
                 Page: page,
-                PageSize: pageSize),
+                PageSize: pageSize,
+                Snapshot: snapshot),
             cancellationToken);
     }
 }

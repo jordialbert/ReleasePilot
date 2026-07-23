@@ -20,6 +20,11 @@ public sealed class ListPromotionsQueryHandler(
             throw new InvalidInput("pageSize");
         }
 
+        if (query.Page > 1 && query.Snapshot is null)
+        {
+            throw new InvalidInput("snapshot");
+        }
+
         if (await applications.Find(
                 new ReleaseManagement.Domain.ApplicationId(query.ApplicationId),
                 cancellationToken) is null)

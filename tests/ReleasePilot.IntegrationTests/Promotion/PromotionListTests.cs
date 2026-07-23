@@ -19,6 +19,7 @@ public sealed class PromotionListTests : PromotionIntegrationTest
         Assert.Equal(20, empty.GetProperty("pageSize").GetInt32());
         Assert.Equal(0, empty.GetProperty("totalCount").GetInt64());
         Assert.Empty(empty.GetProperty("items").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, empty.GetProperty("snapshot").ValueKind);
 
         Client.DefaultRequestHeaders.Add(
             "X-User-Id",
@@ -92,14 +93,46 @@ public sealed class PromotionListTests : PromotionIntegrationTest
         var first = await (await Client.GetAsync(
                 "/applications/01900000-0000-7000-8000-000000000101/promotions?page=1&pageSize=2"))
             .Content.ReadFromJsonAsync<JsonElement>();
+        var snapshot = first.GetProperty("snapshot");
+        var snapshotRequestedAt = Uri.EscapeDataString(
+            snapshot.GetProperty("requestedAt").GetString()!);
+        var snapshotPromotionId =
+            snapshot.GetProperty("promotionId").GetString();
+        var snapshotQuery =
+            $"&snapshotRequestedAt={snapshotRequestedAt}&snapshotPromotionId={snapshotPromotionId}";
+
+        await using (var connection = new NpgsqlConnection(Database.GetConnectionString()))
+        {
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand(
+                """
+                INSERT INTO promotions (
+                    id, application_id, application_version_id, target_environment,
+                    status, requested_by, requested_at, completed_at
+                )
+                VALUES (
+                    '01900000-0000-7000-8000-000000000306',
+                    '01900000-0000-7000-8000-000000000101',
+                    '01900000-0000-7000-8000-000000000202', 'production', 'completed',
+                    '01900000-0000-7000-8000-000000000002',
+                    '2026-07-24T14:00:00Z', '2026-07-24T14:01:00Z'
+                )
+                """,
+                connection);
+            await command.ExecuteNonQueryAsync();
+        }
+
         var second = await (await Client.GetAsync(
-                "/applications/01900000-0000-7000-8000-000000000101/promotions?page=2&pageSize=2"))
+                "/applications/01900000-0000-7000-8000-000000000101/promotions?page=2&pageSize=2"
+                + snapshotQuery))
             .Content.ReadFromJsonAsync<JsonElement>();
         var third = await (await Client.GetAsync(
-                "/applications/01900000-0000-7000-8000-000000000101/promotions?page=3&pageSize=2"))
+                "/applications/01900000-0000-7000-8000-000000000101/promotions?page=3&pageSize=2"
+                + snapshotQuery))
             .Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal(5, first.GetProperty("totalCount").GetInt64());
+        Assert.Equal(5, second.GetProperty("totalCount").GetInt64());
         Assert.Equal(2, second.GetProperty("page").GetInt32());
         Assert.Equal(
             [
@@ -127,6 +160,11 @@ public sealed class PromotionListTests : PromotionIntegrationTest
             HttpStatusCode.BadRequest,
             (await Client.GetAsync(
                 "/applications/01900000-0000-7000-8000-000000000101/promotions?page=0"))
+            .StatusCode);
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (await Client.GetAsync(
+                "/applications/01900000-0000-7000-8000-000000000101/promotions?page=2"))
             .StatusCode);
         var invalidPageSize = await Client.GetAsync(
             "/applications/01900000-0000-7000-8000-000000000101/promotions?pageSize=101");
