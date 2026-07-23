@@ -36,11 +36,16 @@ public sealed class RequestPromotionCommandHandler(
         var lastCompletedEnvironment = await promotions.FindLastCompletedEnvironment(
             versionId,
             cancellationToken);
+        var hasActivePromotion = await promotions.HasActivePromotion(
+            version.ApplicationId,
+            targetEnvironment,
+            cancellationToken);
         var promotion = Promotion.Request(
             new PromotionId(Guid.CreateVersion7()),
             version,
             targetEnvironment,
             lastCompletedEnvironment,
+            hasActivePromotion,
             actor,
             DateTimeOffset.UtcNow);
 

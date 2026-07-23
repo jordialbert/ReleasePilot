@@ -24,6 +24,7 @@ public sealed class PromotionTests
             Version,
             DeploymentEnvironment.Dev,
             null,
+            false,
             Actor,
             requestedAt);
 
@@ -44,10 +45,26 @@ public sealed class PromotionTests
             Version,
             target,
             null,
+            false,
             Actor,
             DateTimeOffset.UtcNow));
 
         Assert.Equal("environment_skipped", exception.Code);
+    }
+
+    [Fact]
+    public void RejectsACompetingActivePromotion()
+    {
+        var exception = Assert.Throws<ActivePromotionAlreadyExists>(() => Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            true,
+            Actor,
+            DateTimeOffset.UtcNow));
+
+        Assert.Equal("active_promotion_already_exists", exception.Code);
     }
 
 }

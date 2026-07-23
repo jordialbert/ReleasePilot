@@ -41,9 +41,15 @@ public sealed class Promotion
         ApplicationVersion version,
         DeploymentEnvironment targetEnvironment,
         DeploymentEnvironment? lastCompletedEnvironment,
+        bool hasActivePromotion,
         Actor actor,
         DateTimeOffset requestedAt)
     {
+        if (hasActivePromotion)
+        {
+            throw new ActivePromotionAlreadyExists();
+        }
+
         var expectedEnvironment = lastCompletedEnvironment switch
         {
             null => DeploymentEnvironment.Dev,

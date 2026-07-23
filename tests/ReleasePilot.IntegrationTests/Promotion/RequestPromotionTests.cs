@@ -34,7 +34,7 @@ public sealed class RequestPromotionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RequestsAndInspectsPromotion()
+    public async Task RequestsAndInspectsPromotionWithControlledConflicts()
     {
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/docs")).StatusCode);
         Assert.Equal(
@@ -86,6 +86,20 @@ public sealed class RequestPromotionTests : IAsyncLifetime
             Assert.Equal(1, reader.GetInt64(1));
         }
 
+        var activeConflict = await client.PostAsJsonAsync(
+            "/promotions",
+            new
+            {
+                applicationVersionId = "01900000-0000-7000-8000-000000000202",
+                targetEnvironment = "dev"
+            });
+        Assert.Equal(HttpStatusCode.Conflict, activeConflict.StatusCode);
+        Assert.Equal(
+            "active_promotion_already_exists",
+            (await activeConflict.Content.ReadFromJsonAsync<JsonElement>())
+                .GetProperty("code")
+                .GetString());
+
         var skippedEnvironment = await client.PostAsJsonAsync(
             "/promotions",
             new
@@ -99,6 +113,17 @@ public sealed class RequestPromotionTests : IAsyncLifetime
             (await skippedEnvironment.Content.ReadFromJsonAsync<JsonElement>())
                 .GetProperty("code")
                 .GetString());
+
+        var concurrentRequest = new
+        {
+            applicationVersionId = "01900000-0000-7000-8000-000000000203",
+            targetEnvironment = "dev"
+        };
+        var concurrent = await Task.WhenAll(
+            client.PostAsJsonAsync("/promotions", concurrentRequest),
+            client.PostAsJsonAsync("/promotions", concurrentRequest));
+        Assert.Single(concurrent, item => item.StatusCode == HttpStatusCode.Created);
+        Assert.Single(concurrent, item => item.StatusCode == HttpStatusCode.Conflict);
 
         client.DefaultRequestHeaders.Remove("X-User-Id");
         var missingActor = await client.PostAsJsonAsync(

@@ -88,13 +88,38 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
         };
     }
 
+    public async Task<bool> HasActivePromotion(
+        ReleaseManagement.Domain.ApplicationId applicationId,
+        DeploymentEnvironment targetEnvironment,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM promotions
+                WHERE application_id = $1
+                  AND target_environment = $2
+                  AND status IN ('requested', 'approved', 'deploying')
+            )
+            """,
+            connection);
+        command.Parameters.AddWithValue(applicationId.Value);
+        command.Parameters.AddWithValue(targetEnvironment.ToString().ToLowerInvariant());
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
     public async Task Add(Promotion promotion, CancellationToken cancellationToken)
     {
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        await using (var command = new NpgsqlCommand(
+        try
+        {
+            await using (var command = new NpgsqlCommand(
                 """
                 INSERT INTO promotions (
                     id, application_id, application_version_id, target_environment,
@@ -156,7 +181,13 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
                 await command.ExecuteNonQueryAsync(cancellationToken);
             }
 
-        await transaction.CommitAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (PostgresException exception)
+            when (exception.ConstraintName == "promotions_active_target")
+        {
+            throw new ActivePromotionAlreadyExists();
+        }
     }
 
     public async Task<PromotionDetailsResponse?> Find(
