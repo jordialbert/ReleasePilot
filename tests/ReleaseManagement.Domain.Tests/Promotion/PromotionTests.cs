@@ -23,6 +23,7 @@ public sealed class PromotionTests
             new PromotionId(Guid.CreateVersion7()),
             Version,
             DeploymentEnvironment.Dev,
+            null,
             Actor,
             requestedAt);
 
@@ -31,6 +32,22 @@ public sealed class PromotionTests
         Assert.Equal(promotion.Id, promotion.RequestedEvent.PromotionId);
         Assert.Equal(Actor.Id, promotion.RequestedEvent.ActorId);
         Assert.Equal(requestedAt, promotion.RequestedEvent.OccurredAt);
+    }
+
+    [Theory]
+    [InlineData(DeploymentEnvironment.Staging)]
+    [InlineData(DeploymentEnvironment.Production)]
+    public void RejectsAFirstPromotionOutsideDev(DeploymentEnvironment target)
+    {
+        var exception = Assert.Throws<EnvironmentSkipped>(() => Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            target,
+            null,
+            Actor,
+            DateTimeOffset.UtcNow));
+
+        Assert.Equal("environment_skipped", exception.Code);
     }
 
 }

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using ReleaseManagement.Application;
+using ReleaseManagement.Domain;
 
 namespace ReleasePilot.Api.Shared;
 
@@ -38,6 +39,13 @@ public sealed class ProblemDetailsExceptionHandler : IExceptionHandler
             code = resourceNotFound.Code;
             title = resourceNotFound.Message;
         }
+        else if (exception is DomainException domainException)
+        {
+            status = StatusCodes.Status409Conflict;
+            code = domainException.Code;
+            title = domainException.Message;
+        }
+
         await Results.Problem(
             statusCode: status,
             title: title,

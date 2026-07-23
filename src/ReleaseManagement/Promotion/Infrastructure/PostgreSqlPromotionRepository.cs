@@ -56,6 +56,38 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
             new ApplicationVersionLabel(reader.GetString(1)));
     }
 
+    public async Task<DeploymentEnvironment?> FindLastCompletedEnvironment(
+        ApplicationVersionId id,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT target_environment
+            FROM promotions
+            WHERE application_version_id = $1 AND status = 'completed'
+            ORDER BY CASE target_environment
+                WHEN 'production' THEN 3
+                WHEN 'staging' THEN 2
+                ELSE 1
+            END DESC
+            LIMIT 1
+            """,
+            connection);
+        command.Parameters.AddWithValue(id.Value);
+        var value = await command.ExecuteScalarAsync(cancellationToken);
+
+        return value switch
+        {
+            null => null,
+            "dev" => DeploymentEnvironment.Dev,
+            "staging" => DeploymentEnvironment.Staging,
+            "production" => DeploymentEnvironment.Production,
+            _ => throw new InvalidOperationException("Unsupported persisted Environment.")
+        };
+    }
+
     public async Task Add(Promotion promotion, CancellationToken cancellationToken)
     {
         await using var connection = new NpgsqlConnection(connectionString);

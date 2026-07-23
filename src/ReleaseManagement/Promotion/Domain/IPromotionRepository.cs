@@ -6,5 +6,8 @@ public interface IPromotionRepository
     Task<ApplicationVersion?> FindApplicationVersion(
         ApplicationVersionId id,
         CancellationToken cancellationToken);
+    Task<DeploymentEnvironment?> FindLastCompletedEnvironment(
+        ApplicationVersionId id,
+        CancellationToken cancellationToken);
     Task Add(Promotion promotion, CancellationToken cancellationToken);
 }

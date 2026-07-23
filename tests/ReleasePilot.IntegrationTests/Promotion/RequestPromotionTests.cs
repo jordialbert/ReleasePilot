@@ -86,6 +86,20 @@ public sealed class RequestPromotionTests : IAsyncLifetime
             Assert.Equal(1, reader.GetInt64(1));
         }
 
+        var skippedEnvironment = await client.PostAsJsonAsync(
+            "/promotions",
+            new
+            {
+                applicationVersionId = "01900000-0000-7000-8000-000000000203",
+                targetEnvironment = "production"
+            });
+        Assert.Equal(HttpStatusCode.Conflict, skippedEnvironment.StatusCode);
+        Assert.Equal(
+            "environment_skipped",
+            (await skippedEnvironment.Content.ReadFromJsonAsync<JsonElement>())
+                .GetProperty("code")
+                .GetString());
+
         client.DefaultRequestHeaders.Remove("X-User-Id");
         var missingActor = await client.PostAsJsonAsync(
             "/promotions",

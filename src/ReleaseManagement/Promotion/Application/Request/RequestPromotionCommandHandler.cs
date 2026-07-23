@@ -33,10 +33,14 @@ public sealed class RequestPromotionCommandHandler(
             throw new ResourceNotFound("application_version");
         }
 
+        var lastCompletedEnvironment = await promotions.FindLastCompletedEnvironment(
+            versionId,
+            cancellationToken);
         var promotion = Promotion.Request(
             new PromotionId(Guid.CreateVersion7()),
             version,
             targetEnvironment,
+            lastCompletedEnvironment,
             actor,
             DateTimeOffset.UtcNow);
 
