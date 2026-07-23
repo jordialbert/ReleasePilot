@@ -293,5 +293,4 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
             history,
             releaseNotesDraft);
     }
-
 }
