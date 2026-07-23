@@ -36,6 +36,10 @@ builder.Services.AddSingleton<IPromotionRepository>(
     services => services.GetRequiredService<PostgreSqlPromotionRepository>());
 builder.Services.AddSingleton<IPromotionDetailsReader>(
     services => services.GetRequiredService<PostgreSqlPromotionRepository>());
+builder.Services.AddSingleton<IUserRepository>(
+    new PostgreSqlUserRepository(connectionString));
+builder.Services.AddSingleton<IApplicationVersionRepository>(
+    new PostgreSqlApplicationVersionRepository(connectionString));
 builder.Services.AddSingleton<InMemoryDeploymentPort>();
 builder.Services.AddSingleton<IDeploymentPort>(
     services => services.GetRequiredService<InMemoryDeploymentPort>());

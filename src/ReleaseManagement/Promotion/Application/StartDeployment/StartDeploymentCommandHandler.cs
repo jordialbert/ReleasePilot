@@ -3,6 +3,7 @@ using ReleaseManagement.Domain;
 namespace ReleaseManagement.Application;
 
 public sealed class StartDeploymentCommandHandler(
+    IUserRepository users,
     IPromotionRepository promotions,
     IDeploymentPort deployment)
 {
@@ -10,7 +11,7 @@ public sealed class StartDeploymentCommandHandler(
         StartDeploymentCommand command,
         CancellationToken cancellationToken)
     {
-        var actor = await promotions.FindActor(
+        var actor = await users.Find(
             new UserId(command.ActorId),
             cancellationToken);
         if (actor is null)

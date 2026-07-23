@@ -2,10 +2,6 @@ namespace ReleaseManagement.Domain;
 
 public interface IPromotionRepository
 {
-    Task<Actor?> FindActor(UserId id, CancellationToken cancellationToken);
-    Task<ApplicationVersion?> FindApplicationVersion(
-        ApplicationVersionId id,
-        CancellationToken cancellationToken);
     Task<DeploymentEnvironment?> FindLastCompletedEnvironment(
         ApplicationVersionId id,
         CancellationToken cancellationToken);

@@ -9,53 +9,6 @@ namespace ReleaseManagement.Infrastructure;
 public sealed class PostgreSqlPromotionRepository(string connectionString)
     : IPromotionRepository, IPromotionDetailsReader
 {
-    public async Task<Actor?> FindActor(UserId id, CancellationToken cancellationToken)
-    {
-        await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(
-            "SELECT name, role FROM users WHERE id = $1",
-            connection);
-        command.Parameters.AddWithValue(id.Value);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-        if (!await reader.ReadAsync(cancellationToken))
-        {
-            return null;
-        }
-
-        var role = reader.GetString(1) switch
-        {
-            "operator" => UserRole.Operator,
-            "approver" => UserRole.Approver,
-            _ => throw new InvalidOperationException("Unsupported persisted user role.")
-        };
-        return new Actor(id, reader.GetString(0), role);
-    }
-
-    public async Task<ApplicationVersion?> FindApplicationVersion(
-        ApplicationVersionId id,
-        CancellationToken cancellationToken)
-    {
-        await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(
-            "SELECT application_id, label FROM application_versions WHERE id = $1",
-            connection);
-        command.Parameters.AddWithValue(id.Value);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-        if (!await reader.ReadAsync(cancellationToken))
-        {
-            return null;
-        }
-
-        return new ApplicationVersion(
-            id,
-            new ReleaseManagement.Domain.ApplicationId(reader.GetGuid(0)),
-            new ApplicationVersionLabel(reader.GetString(1)));
-    }
-
     public async Task<DeploymentEnvironment?> FindLastCompletedEnvironment(
         ApplicationVersionId id,
         CancellationToken cancellationToken)
