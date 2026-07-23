@@ -8,6 +8,8 @@
 
 **Branch:** `test/verify-release-journey`
 
+**Architecture constraints:** Use the single `src/ReleaseManagement/ReleaseManagement.csproj`; place business modules directly under `ReleaseManagement` with Domain/Application/Infrastructure inside the owning module; keep one top-level type per matching file; define public routes as topic-controller action methods; keep `Program.cs` route-free; do not retain empty directories.
+
 **Proposed commits:**
 
 1. `test: configure isolated end-to-end test databases`

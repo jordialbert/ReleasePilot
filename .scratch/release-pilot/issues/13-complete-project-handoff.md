@@ -8,6 +8,8 @@
 
 **Branch:** `docs/complete-project-handoff`
 
+**Architecture constraints:** Use the single `src/ReleaseManagement/ReleaseManagement.csproj`; place business modules directly under `ReleaseManagement` with Domain/Application/Infrastructure inside the owning module; keep one top-level type per matching file; define public routes as topic-controller action methods; keep `Program.cs` route-free; do not retain empty directories.
+
 **Proposed commits:**
 
 1. `docs: explain local startup and database reset`
@@ -15,7 +17,7 @@
 3. `docs: explain architecture and operational trade-offs`
 4. `docs: add walkthrough and AI session handoff`
 
-- [ ] The README documents prerequisites, one-command startup, Swagger, health, fixed seed identifiers, database reset, and test commands.
+- [ ] The README documents prerequisites, one-command startup, Swagger UI at `/docs`, health, fixed seed identifiers, database reset, and test commands.
 - [ ] Copy-paste examples cover all six commands and all three queries.
 - [ ] Documentation demonstrates successful progression plus cancellation, rollback, retry, pagination, delivery retry, and Release Notes behavior.
 - [ ] Architecture notes explain the Promotion aggregate, CQRS/use-case boundary, transactional Domain Events, PostgreSQL delivery queue, consumer idempotency, ports, and agent loop.

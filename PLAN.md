@@ -41,9 +41,20 @@ Release Management is the only bounded context. ReleasePilot is the product and 
 │       └── Worker/
 ├── src/
 │   └── ReleaseManagement/
-│       ├── Domain/
+│       ├── ReleaseManagement.csproj
 │       ├── Application/
-│       └── Infrastructure/
+│       │   └── Domain/
+│       ├── ApplicationVersion/
+│       │   └── Domain/
+│       ├── Environment/
+│       │   └── Domain/
+│       ├── Promotion/
+│       │   ├── Application/
+│       │   ├── Domain/
+│       │   └── Infrastructure/
+│       └── User/
+│           ├── Application/
+│           └── Domain/
 ├── tests/
 │   ├── ReleaseManagement.Domain.Tests/
 │   ├── ReleasePilot.IntegrationTests/
@@ -64,13 +75,15 @@ Release Management is the only bounded context. ReleasePilot is the product and 
 Projects and dependencies:
 
 ```text
-ReleaseManagement.Domain          → no project dependency
-ReleaseManagement.Application     → Domain
-ReleaseManagement.Infrastructure  → Application + Domain
-API and worker                    → Application + Infrastructure
+ReleaseManagement  → one bounded-context assembly
+API and worker     → ReleaseManagement
 ```
 
-No `src/Shared` directory will be created unless a genuinely cross-context concept emerges.
+Business modules live directly under `src/ReleaseManagement`; no `Modules`, `Contexts`, or layer-first parent directory is introduced. Each module contains only the Domain, Application, and Infrastructure directories it actually needs. Empty placeholder directories are not kept.
+
+Each top-level class, record, enum, interface, or struct has a matching file. API routes are attribute-routed controller action methods grouped by topic under `apps/ReleasePilot/Api`. `Program.cs` contains service registration and middleware composition only; application endpoints are never declared with minimal-API `Map*` calls.
+
+Tests mirror the production business topic. No `src/Shared` directory will be created unless a genuinely cross-context concept emerges.
 
 ## CQRS and use cases
 
@@ -92,12 +105,12 @@ There is no MediatR dependency, custom command bus, custom query bus, or generic
 Example folders:
 
 ```text
-Application/Promotions/Request/
+Promotion/Application/Request/
 ├── RequestPromotionCommand.cs
 ├── RequestPromotionCommandHandler.cs
 └── PromotionRequester.cs
 
-Application/Promotions/GetDetails/
+Promotion/Application/GetDetails/
 ├── GetPromotionDetailsQuery.cs
 ├── GetPromotionDetailsQueryHandler.cs
 ├── PromotionDetailsFinder.cs
@@ -454,7 +467,7 @@ Responses use Problem Details plus stable `code` and `traceId` fields:
 
 Raw database and upstream errors are never returned. Public idempotency-key storage is out of scope; repeated commands produce controlled conflicts.
 
-Swagger UI is enabled by the API in every environment and is available at `/swagger`.
+Swagger UI is enabled by the API in every environment and is available at `/docs`.
 
 ## AI release-notes agent
 
@@ -513,7 +526,7 @@ The API exposes:
 
 ```text
 http://localhost:8080
-http://localhost:8080/swagger
+http://localhost:8080/docs
 http://localhost:8080/health
 ```
 
