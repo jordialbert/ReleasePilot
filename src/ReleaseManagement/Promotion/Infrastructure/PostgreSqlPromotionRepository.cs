@@ -117,7 +117,7 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
         await using var command = new NpgsqlCommand(
             """
             SELECT application_id, application_version_id, target_environment,
-                   status, requested_by, requested_at
+                   status, requested_by, requested_at, completed_at
             FROM promotions
             WHERE id = $1
             """,
@@ -147,6 +147,12 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
             "rolled_back" => PromotionStatus.RolledBack,
             _ => throw new InvalidOperationException("Unsupported persisted Promotion status.")
         };
+        DateTimeOffset? completedAt = null;
+        if (!reader.IsDBNull(6))
+        {
+            completedAt = reader.GetFieldValue<DateTimeOffset>(6);
+        }
+
         return new Promotion(
             id,
             new ReleaseManagement.Domain.ApplicationId(reader.GetGuid(0)),
@@ -154,7 +160,8 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
             targetEnvironment,
             status,
             new UserId(reader.GetGuid(4)),
-            reader.GetFieldValue<DateTimeOffset>(5));
+            reader.GetFieldValue<DateTimeOffset>(5),
+            completedAt);
     }
 
     public async Task Update(Promotion promotion, CancellationToken cancellationToken)
@@ -168,6 +175,7 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
         {
             PromotionApproved => ("requested", "approved"),
             DeploymentStarted => ("approved", "deploying"),
+            PromotionCompleted => ("deploying", "completed"),
             _ => throw new UnreachableException()
         };
         await using var connection = new NpgsqlConnection(connectionString);
@@ -176,7 +184,7 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
         await using (var command = new NpgsqlCommand(
             """
             UPDATE promotions
-            SET status = $2
+            SET status = $2, completed_at = $4
             WHERE id = $1 AND status = $3
             """,
             connection,
@@ -185,9 +193,17 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
             command.Parameters.AddWithValue(promotion.Id.Value);
             command.Parameters.AddWithValue(to);
             command.Parameters.AddWithValue(from);
+            if (promotion.CompletedAt is null)
+            {
+                command.Parameters.AddWithValue(DBNull.Value);
+            }
+            else
+            {
+                command.Parameters.AddWithValue(promotion.CompletedAt.Value);
+            }
             if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
             {
-                throw new InvalidPromotionTransition();
+                throw new ConcurrentPromotionUpdate();
             }
         }
 

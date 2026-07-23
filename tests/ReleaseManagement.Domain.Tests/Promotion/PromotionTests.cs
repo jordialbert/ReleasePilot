@@ -181,4 +181,87 @@ public sealed class PromotionTests
         Assert.Same(uncommittedEvent, promotion.UncommittedEvent);
     }
 
+    [Fact]
+    public void CompletesDeployingPromotionAndRecordsItsEvent()
+    {
+        var completedAt = DateTimeOffset.Parse("2026-07-23T12:15:00Z");
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            false,
+            Approver,
+            DateTimeOffset.Parse("2026-07-23T12:00:00Z"));
+        promotion.Approve(Approver, DateTimeOffset.Parse("2026-07-23T12:05:00Z"));
+        promotion.StartDeployment(Actor, DateTimeOffset.Parse("2026-07-23T12:10:00Z"));
+
+        promotion.Complete(Actor, completedAt);
+
+        Assert.Equal(PromotionStatus.Completed, promotion.Status);
+        Assert.Equal(completedAt, promotion.CompletedAt);
+        var domainEvent = Assert.IsType<PromotionCompleted>(promotion.UncommittedEvent);
+        Assert.Equal(promotion.Id, domainEvent.PromotionId);
+        Assert.Equal(Actor.Id, domainEvent.ActorId);
+        Assert.Equal(completedAt, domainEvent.OccurredAt);
+    }
+
+    [Fact]
+    public void CompletedPromotionRejectsEveryLaterTransition()
+    {
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            false,
+            Approver,
+            DateTimeOffset.UtcNow);
+        promotion.Approve(Approver, DateTimeOffset.UtcNow);
+        promotion.StartDeployment(Actor, DateTimeOffset.UtcNow);
+        promotion.Complete(Actor, DateTimeOffset.UtcNow);
+        var uncommittedEvent = promotion.UncommittedEvent;
+
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.Approve(Approver, DateTimeOffset.UtcNow));
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.StartDeployment(Actor, DateTimeOffset.UtcNow));
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.Complete(Actor, DateTimeOffset.UtcNow));
+        Assert.Equal(PromotionStatus.Completed, promotion.Status);
+        Assert.Same(uncommittedEvent, promotion.UncommittedEvent);
+    }
+
+    [Theory]
+    [InlineData(DeploymentEnvironment.Dev, DeploymentEnvironment.Staging)]
+    [InlineData(DeploymentEnvironment.Staging, DeploymentEnvironment.Production)]
+    public void RequestsOnlyTheEnvironmentAfterThePipelinePosition(
+        DeploymentEnvironment completed,
+        DeploymentEnvironment target)
+    {
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            target,
+            completed,
+            false,
+            Actor,
+            DateTimeOffset.UtcNow);
+
+        Assert.Equal(target, promotion.TargetEnvironment);
+    }
+
+    [Fact]
+    public void ProductionPipelinePositionEndsProgression()
+    {
+        Assert.Throws<EnvironmentAlreadyCompleted>(() => Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Production,
+            DeploymentEnvironment.Production,
+            false,
+            Actor,
+            DateTimeOffset.UtcNow));
+    }
+
 }

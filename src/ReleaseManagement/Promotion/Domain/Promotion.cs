@@ -34,7 +34,8 @@ public sealed class Promotion
         DeploymentEnvironment targetEnvironment,
         PromotionStatus status,
         UserId requestedBy,
-        DateTimeOffset requestedAt)
+        DateTimeOffset requestedAt,
+        DateTimeOffset? completedAt)
     {
         Id = id;
         ApplicationId = applicationId;
@@ -43,6 +44,7 @@ public sealed class Promotion
         Status = status;
         RequestedBy = requestedBy;
         RequestedAt = requestedAt;
+        CompletedAt = completedAt;
     }
 
     public PromotionId Id { get; }
@@ -52,6 +54,7 @@ public sealed class Promotion
     public PromotionStatus Status { get; private set; }
     public UserId RequestedBy { get; }
     public DateTimeOffset RequestedAt { get; }
+    public DateTimeOffset? CompletedAt { get; private set; }
     public PromotionDomainEvent? UncommittedEvent { get; private set; }
 
     public static Promotion Request(
@@ -105,6 +108,13 @@ public sealed class Promotion
 
     public void Approve(Actor actor, DateTimeOffset approvedAt)
     {
+        if (Status is PromotionStatus.Completed
+            or PromotionStatus.Cancelled
+            or PromotionStatus.RolledBack)
+        {
+            throw new TerminalPromotionIsImmutable();
+        }
+
         if (actor.Role != UserRole.Approver)
         {
             throw new OnlyApproverCanApprove();
@@ -125,6 +135,13 @@ public sealed class Promotion
 
     public void StartDeployment(Actor actor, DateTimeOffset startedAt)
     {
+        if (Status is PromotionStatus.Completed
+            or PromotionStatus.Cancelled
+            or PromotionStatus.RolledBack)
+        {
+            throw new TerminalPromotionIsImmutable();
+        }
+
         if (Status != PromotionStatus.Approved)
         {
             throw new InvalidPromotionTransition();
@@ -135,6 +152,29 @@ public sealed class Promotion
             new DomainEventId(Guid.CreateVersion7()),
             Id,
             startedAt,
+            actor.Id);
+    }
+
+    public void Complete(Actor actor, DateTimeOffset completedAt)
+    {
+        if (Status is PromotionStatus.Completed
+            or PromotionStatus.Cancelled
+            or PromotionStatus.RolledBack)
+        {
+            throw new TerminalPromotionIsImmutable();
+        }
+
+        if (Status != PromotionStatus.Deploying)
+        {
+            throw new InvalidPromotionTransition();
+        }
+
+        Status = PromotionStatus.Completed;
+        CompletedAt = completedAt;
+        UncommittedEvent = new PromotionCompleted(
+            new DomainEventId(Guid.CreateVersion7()),
+            Id,
+            completedAt,
             actor.Id);
     }
 }

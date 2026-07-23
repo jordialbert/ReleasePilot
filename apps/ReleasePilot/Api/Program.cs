@@ -50,6 +50,7 @@ builder.Services.AddSingleton<IDeploymentPort>(
 builder.Services.AddScoped<RequestPromotionCommandHandler>();
 builder.Services.AddScoped<ApprovePromotionCommandHandler>();
 builder.Services.AddScoped<StartDeploymentCommandHandler>();
+builder.Services.AddScoped<CompletePromotionCommandHandler>();
 builder.Services.AddScoped<GetPromotionDetailsQueryHandler>();
 builder.Services.AddScoped<ListPromotionsQueryHandler>();
 builder.Services
