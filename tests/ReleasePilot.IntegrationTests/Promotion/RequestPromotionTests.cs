@@ -198,17 +198,9 @@ public sealed class RequestPromotionTests : IAsyncLifetime
         client.DefaultRequestHeaders.Add(
             "X-User-Id",
             "01900000-0000-7000-8000-000000000002");
-        var operatorPromotion = await client.PostAsJsonAsync(
-            "/promotions",
-            new
-            {
-                applicationVersionId = "01900000-0000-7000-8000-000000000203",
-                targetEnvironment = "dev"
-            });
-        promotion = await operatorPromotion.Content.ReadFromJsonAsync<JsonElement>();
 
         var forbidden = await client.PostAsync(
-            $"/promotions/{promotion.GetProperty("id").GetString()}/approve",
+            $"/promotions/{promotionId}/approve",
             null);
 
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);

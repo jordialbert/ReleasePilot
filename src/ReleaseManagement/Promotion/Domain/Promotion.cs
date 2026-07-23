@@ -106,14 +106,14 @@ public sealed class Promotion
 
     public void Approve(Actor actor, DateTimeOffset approvedAt)
     {
-        if (Status != PromotionStatus.Requested)
-        {
-            throw new InvalidPromotionTransition();
-        }
-
         if (actor.Role != UserRole.Approver)
         {
             throw new OnlyApproverCanApprove();
+        }
+
+        if (Status != PromotionStatus.Requested)
+        {
+            throw new InvalidPromotionTransition();
         }
 
         Status = PromotionStatus.Approved;
