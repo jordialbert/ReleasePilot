@@ -14,6 +14,11 @@ public sealed class PromotionTests
         "Riley Operator",
         UserRole.Operator);
 
+    private static readonly Actor Approver = new(
+        new UserId(Guid.Parse("01900000-0000-7000-8000-000000000001")),
+        "Alex Approver",
+        UserRole.Approver);
+
     [Fact]
     public void RequestsFirstDevPromotionAndRecordsItsEvent()
     {
@@ -30,7 +35,7 @@ public sealed class PromotionTests
 
         Assert.Equal(PromotionStatus.Requested, promotion.Status);
         Assert.Equal(DeploymentEnvironment.Dev, promotion.TargetEnvironment);
-        Assert.Equal(promotion.Id, promotion.RequestedEvent.PromotionId);
+        Assert.Equal(promotion.Id, promotion.RequestedEvent!.PromotionId);
         Assert.Equal(Actor.Id, promotion.RequestedEvent.ActorId);
         Assert.Equal(requestedAt, promotion.RequestedEvent.OccurredAt);
     }
@@ -65,6 +70,27 @@ public sealed class PromotionTests
             DateTimeOffset.UtcNow));
 
         Assert.Equal("active_promotion_already_exists", exception.Code);
+    }
+
+    [Fact]
+    public void ApproverApprovesRequestedPromotionAndRecordsItsEvent()
+    {
+        var approvedAt = DateTimeOffset.Parse("2026-07-23T12:05:00Z");
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            false,
+            Approver,
+            DateTimeOffset.Parse("2026-07-23T12:00:00Z"));
+
+        promotion.Approve(Approver, approvedAt);
+
+        Assert.Equal(PromotionStatus.Approved, promotion.Status);
+        Assert.Equal(promotion.Id, promotion.ApprovedEvent!.PromotionId);
+        Assert.Equal(Approver.Id, promotion.ApprovedEvent.ActorId);
+        Assert.Equal(approvedAt, promotion.ApprovedEvent.OccurredAt);
     }
 
 }

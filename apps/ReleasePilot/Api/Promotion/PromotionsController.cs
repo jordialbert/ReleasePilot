@@ -7,6 +7,7 @@ namespace ReleasePilot.Api.Promotion;
 [Route("promotions")]
 public sealed class PromotionsController(
     RequestPromotionCommandHandler requestPromotion,
+    ApprovePromotionCommandHandler approvePromotion,
     GetPromotionDetailsQueryHandler getPromotionDetails) : ControllerBase
 {
     [HttpPost]
@@ -44,6 +45,40 @@ public sealed class PromotionsController(
                 actorId),
             cancellationToken);
         return Created($"/promotions/{promotion.Id}", promotion);
+    }
+
+    [HttpPost("{id}/approve")]
+    public async Task<IActionResult> ApprovePromotion(
+        string id,
+        [FromHeader(Name = "X-User-Id")] string? actorHeader,
+        CancellationToken cancellationToken)
+    {
+        if (actorHeader is null)
+        {
+            var problem = new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "The X-User-Id header is required."
+            };
+            problem.Extensions["code"] = "missing_actor";
+            problem.Extensions["traceId"] = HttpContext.TraceIdentifier;
+            return Unauthorized(problem);
+        }
+
+        if (!Guid.TryParse(actorHeader, out var actorId))
+        {
+            throw new InvalidInput("X-User-Id");
+        }
+
+        if (!Guid.TryParse(id, out var promotionId))
+        {
+            throw new InvalidInput("id");
+        }
+
+        await approvePromotion.Handle(
+            new ApprovePromotionCommand(promotionId, actorId),
+            cancellationToken);
+        return NoContent();
     }
 
     [HttpGet("{id}")]

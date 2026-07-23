@@ -152,6 +152,40 @@ public sealed class RequestPromotionTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, missingPromotion.StatusCode);
     }
 
+    [Fact]
+    public async Task ApprovesRequestedPromotion()
+    {
+        client.DefaultRequestHeaders.Add(
+            "X-User-Id",
+            "01900000-0000-7000-8000-000000000001");
+        var created = await client.PostAsJsonAsync(
+            "/promotions",
+            new
+            {
+                applicationVersionId = "01900000-0000-7000-8000-000000000201",
+                targetEnvironment = "dev"
+            });
+        var promotion = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var promotionId = promotion.GetProperty("id").GetString();
+
+        var approval = await client.PostAsync(
+            $"/promotions/{promotionId}/approve",
+            null);
+
+        Assert.Equal(HttpStatusCode.NoContent, approval.StatusCode);
+        var details = await client.GetFromJsonAsync<JsonElement>(
+            $"/promotions/{promotionId}");
+        Assert.Equal("approved", details.GetProperty("status").GetString());
+        Assert.Equal(2, details.GetProperty("history").GetArrayLength());
+        Assert.Equal(
+            "promotion_requested",
+            details.GetProperty("history")[0].GetProperty("type").GetString());
+        Assert.Equal(
+            "promotion_approved",
+            details.GetProperty("history")[1].GetProperty("type").GetString());
+
+    }
+
     public async Task DisposeAsync()
     {
         client.Dispose();

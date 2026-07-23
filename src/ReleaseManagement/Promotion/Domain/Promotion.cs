@@ -27,14 +27,33 @@ public sealed class Promotion
             targetEnvironment);
     }
 
+    internal Promotion(
+        PromotionId id,
+        ApplicationId applicationId,
+        ApplicationVersionId applicationVersionId,
+        DeploymentEnvironment targetEnvironment,
+        PromotionStatus status,
+        UserId requestedBy,
+        DateTimeOffset requestedAt)
+    {
+        Id = id;
+        ApplicationId = applicationId;
+        ApplicationVersionId = applicationVersionId;
+        TargetEnvironment = targetEnvironment;
+        Status = status;
+        RequestedBy = requestedBy;
+        RequestedAt = requestedAt;
+    }
+
     public PromotionId Id { get; }
     public ApplicationId ApplicationId { get; }
     public ApplicationVersionId ApplicationVersionId { get; }
     public DeploymentEnvironment TargetEnvironment { get; }
-    public PromotionStatus Status { get; }
+    public PromotionStatus Status { get; private set; }
     public UserId RequestedBy { get; }
     public DateTimeOffset RequestedAt { get; }
-    public PromotionRequested RequestedEvent { get; }
+    public PromotionRequested? RequestedEvent { get; }
+    public PromotionApproved? ApprovedEvent { get; private set; }
 
     public static Promotion Request(
         PromotionId id,
@@ -83,5 +102,15 @@ public sealed class Promotion
             targetEnvironment,
             actor.Id,
             requestedAt);
+    }
+
+    public void Approve(Actor actor, DateTimeOffset approvedAt)
+    {
+        Status = PromotionStatus.Approved;
+        ApprovedEvent = new PromotionApproved(
+            new DomainEventId(Guid.CreateVersion7()),
+            Id,
+            approvedAt,
+            actor.Id);
     }
 }

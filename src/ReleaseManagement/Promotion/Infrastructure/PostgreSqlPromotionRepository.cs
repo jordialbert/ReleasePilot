@@ -140,7 +140,7 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
                 await command.ExecuteNonQueryAsync(cancellationToken);
             }
 
-            var domainEvent = promotion.RequestedEvent;
+            var domainEvent = promotion.RequestedEvent!;
             var payload = JsonSerializer.Serialize(new
             {
                 applicationId = domainEvent.ApplicationId.Value,
@@ -188,6 +188,109 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
         {
             throw new ActivePromotionAlreadyExists();
         }
+    }
+
+    public async Task<Promotion?> Find(
+        PromotionId id,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT application_id, application_version_id, target_environment,
+                   status, requested_by, requested_at
+            FROM promotions
+            WHERE id = $1
+            """,
+            connection);
+        command.Parameters.AddWithValue(id.Value);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        var targetEnvironment = reader.GetString(2) switch
+        {
+            "dev" => DeploymentEnvironment.Dev,
+            "staging" => DeploymentEnvironment.Staging,
+            "production" => DeploymentEnvironment.Production,
+            _ => throw new InvalidOperationException("Unsupported persisted Environment.")
+        };
+        var status = reader.GetString(3) switch
+        {
+            "requested" => PromotionStatus.Requested,
+            "approved" => PromotionStatus.Approved,
+            "deploying" => PromotionStatus.Deploying,
+            "completed" => PromotionStatus.Completed,
+            "cancelled" => PromotionStatus.Cancelled,
+            "rolled_back" => PromotionStatus.RolledBack,
+            _ => throw new InvalidOperationException("Unsupported persisted Promotion status.")
+        };
+        return new Promotion(
+            id,
+            new ReleaseManagement.Domain.ApplicationId(reader.GetGuid(0)),
+            new ApplicationVersionId(reader.GetGuid(1)),
+            targetEnvironment,
+            status,
+            new UserId(reader.GetGuid(4)),
+            reader.GetFieldValue<DateTimeOffset>(5));
+    }
+
+    public async Task Update(Promotion promotion, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using (var command = new NpgsqlCommand(
+            """
+            UPDATE promotions
+            SET status = 'approved'
+            WHERE id = $1
+            """,
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue(promotion.Id.Value);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var domainEvent = promotion.ApprovedEvent!;
+        await using (var command = new NpgsqlCommand(
+            """
+            INSERT INTO domain_events (
+                id, promotion_id, type, occurred_at, actor_id, payload
+            )
+            VALUES ($1, $2, 'promotion_approved', $3, $4, '{}')
+            """,
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue(domainEvent.Id.Value);
+            command.Parameters.AddWithValue(domainEvent.PromotionId.Value);
+            command.Parameters.AddWithValue(domainEvent.OccurredAt);
+            command.Parameters.AddWithValue(domainEvent.ActorId.Value);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var command = new NpgsqlCommand(
+            """
+            INSERT INTO event_deliveries (event_id, consumer, available_at)
+            VALUES
+                ($1, 'audit', $2),
+                ($1, 'release_notes', $2)
+            """,
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue(domainEvent.Id.Value);
+            command.Parameters.AddWithValue(domainEvent.OccurredAt);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task<PromotionDetailsResponse?> Find(
