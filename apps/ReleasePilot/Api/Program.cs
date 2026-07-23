@@ -36,6 +36,8 @@ builder.Services.AddSingleton<IPromotionRepository>(
     services => services.GetRequiredService<PostgreSqlPromotionRepository>());
 builder.Services.AddSingleton<IPromotionDetailsReader>(
     services => services.GetRequiredService<PostgreSqlPromotionRepository>());
+builder.Services.AddSingleton<IPromotionHistoryReader>(
+    services => services.GetRequiredService<PostgreSqlPromotionRepository>());
 builder.Services.AddSingleton<IUserRepository>(
     new PostgreSqlUserRepository(connectionString));
 builder.Services.AddSingleton<IApplicationVersionRepository>(
@@ -47,6 +49,7 @@ builder.Services.AddScoped<RequestPromotionCommandHandler>();
 builder.Services.AddScoped<ApprovePromotionCommandHandler>();
 builder.Services.AddScoped<StartDeploymentCommandHandler>();
 builder.Services.AddScoped<GetPromotionDetailsQueryHandler>();
+builder.Services.AddScoped<ListPromotionHistoryQueryHandler>();
 builder.Services
     .AddHealthChecks()
     .AddCheck("postgresql", () =>
