@@ -58,7 +58,7 @@ Release Management is the only bounded context. ReleasePilot is the product and 
 ├── CONTEXT.md
 ├── Dockerfile
 ├── docker-compose.yml
-└── ReleasePilot.sln
+└── ReleasePilot.slnx
 ```
 
 Projects and dependencies:
@@ -488,7 +488,7 @@ One cache-efficient multi-stage Dockerfile builds either executable through an `
 
 Build order:
 
-1. Copy the solution, project files, and any shared build/package property files.
+1. Copy the project files needed by either executable and any shared build/package property files.
 2. Restore the selected project with `mcr.microsoft.com/dotnet/sdk:10.0.302-noble`.
 3. Copy remaining source.
 4. Publish with `--no-restore`.
@@ -507,7 +507,7 @@ worker
 
 All services use `restart: unless-stopped`. Both application services depend on the healthy, initialized `db` service. The worker hosts the Audit, Notification, and Release Notes consumers; each consumer remains independently extractable into its own executable later.
 
-PostgreSQL uses `postgres:18`, mounts initialization scripts read-only at `/docker-entrypoint-initdb.d`, and mounts its named data volume at PostgreSQL 18’s `/var/lib/postgresql` location.
+PostgreSQL uses `postgres:18.4`, mounts initialization scripts read-only at `/docker-entrypoint-initdb.d`, and mounts its named data volume at PostgreSQL 18’s `/var/lib/postgresql` location.
 
 The API exposes:
 
