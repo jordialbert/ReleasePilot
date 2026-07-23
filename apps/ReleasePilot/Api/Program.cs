@@ -1,5 +1,10 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Npgsql;
+using ReleaseManagement.Application;
+using ReleaseManagement.Domain;
+using ReleaseManagement.Infrastructure;
+using ReleasePilot.Api.Shared;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration["ConnectionStrings:PostgreSQL"]!;
@@ -7,8 +12,32 @@ var connectionString = builder.Configuration["ConnectionStrings:PostgreSQL"]!;
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole();
 builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));
-builder.Services.AddControllers();
+builder.Services
+    .AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var problem = new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "The request is malformed."
+            };
+            problem.Extensions["code"] = "malformed_input";
+            problem.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+            return new BadRequestObjectResult(problem);
+        };
+    });
 builder.Services.AddSwaggerGen();
+builder.Services.AddExceptionHandler<ProblemDetailsExceptionHandler>();
+builder.Services.AddProblemDetails();
+builder.Services.AddSingleton(new PostgreSqlPromotionRepository(connectionString));
+builder.Services.AddSingleton<IPromotionRepository>(
+    services => services.GetRequiredService<PostgreSqlPromotionRepository>());
+builder.Services.AddSingleton<IPromotionDetailsReader>(
+    services => services.GetRequiredService<PostgreSqlPromotionRepository>());
+builder.Services.AddScoped<RequestPromotionCommandHandler>();
+builder.Services.AddScoped<GetPromotionDetailsQueryHandler>();
 builder.Services
     .AddHealthChecks()
     .AddCheck("postgresql", () =>
@@ -41,6 +70,7 @@ builder.Services
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
 app.UseSwagger(options => options.RouteTemplate = "docs/{documentName}/swagger.json");
 app.UseSwaggerUI(options =>
 {
