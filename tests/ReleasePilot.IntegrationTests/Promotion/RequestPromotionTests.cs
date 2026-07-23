@@ -153,7 +153,7 @@ public sealed class RequestPromotionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ApprovesRequestedPromotion()
+    public async Task ApprovesRequestedPromotionWithControlledAuthorization()
     {
         client.DefaultRequestHeaders.Add(
             "X-User-Id",
@@ -183,6 +183,30 @@ public sealed class RequestPromotionTests : IAsyncLifetime
         Assert.Equal(
             "promotion_approved",
             details.GetProperty("history")[1].GetProperty("type").GetString());
+
+        client.DefaultRequestHeaders.Remove("X-User-Id");
+        client.DefaultRequestHeaders.Add(
+            "X-User-Id",
+            "01900000-0000-7000-8000-000000000002");
+        var operatorPromotion = await client.PostAsJsonAsync(
+            "/promotions",
+            new
+            {
+                applicationVersionId = "01900000-0000-7000-8000-000000000203",
+                targetEnvironment = "dev"
+            });
+        promotion = await operatorPromotion.Content.ReadFromJsonAsync<JsonElement>();
+
+        var forbidden = await client.PostAsync(
+            $"/promotions/{promotion.GetProperty("id").GetString()}/approve",
+            null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        Assert.Equal(
+            "only_approver_can_approve",
+            (await forbidden.Content.ReadFromJsonAsync<JsonElement>())
+                .GetProperty("code")
+                .GetString());
 
     }
 

@@ -39,6 +39,12 @@ public sealed class ProblemDetailsExceptionHandler : IExceptionHandler
             code = resourceNotFound.Code;
             title = resourceNotFound.Message;
         }
+        else if (exception is OnlyApproverCanApprove onlyApproverCanApprove)
+        {
+            status = StatusCodes.Status403Forbidden;
+            code = onlyApproverCanApprove.Code;
+            title = onlyApproverCanApprove.Message;
+        }
         else if (exception is DomainException domainException)
         {
             status = StatusCodes.Status409Conflict;

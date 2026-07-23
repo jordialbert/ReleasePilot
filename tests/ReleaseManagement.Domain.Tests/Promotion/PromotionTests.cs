@@ -93,4 +93,24 @@ public sealed class PromotionTests
         Assert.Equal(approvedAt, promotion.ApprovedEvent.OccurredAt);
     }
 
+    [Fact]
+    public void OperatorCannotApprovePromotion()
+    {
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            false,
+            Actor,
+            DateTimeOffset.UtcNow);
+
+        var exception = Assert.Throws<OnlyApproverCanApprove>(
+            () => promotion.Approve(Actor, DateTimeOffset.UtcNow));
+
+        Assert.Equal("only_approver_can_approve", exception.Code);
+        Assert.Equal(PromotionStatus.Requested, promotion.Status);
+        Assert.Null(promotion.ApprovedEvent);
+    }
+
 }

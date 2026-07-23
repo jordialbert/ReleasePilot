@@ -106,6 +106,11 @@ public sealed class Promotion
 
     public void Approve(Actor actor, DateTimeOffset approvedAt)
     {
+        if (actor.Role != UserRole.Approver)
+        {
+            throw new OnlyApproverCanApprove();
+        }
+
         Status = PromotionStatus.Approved;
         ApprovedEvent = new PromotionApproved(
             new DomainEventId(Guid.CreateVersion7()),
