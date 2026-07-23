@@ -7,7 +7,7 @@ var connectionString = builder.Configuration["ConnectionStrings:PostgreSQL"]!;
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole();
 builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));
-builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
 builder.Services
     .AddHealthChecks()
@@ -41,10 +41,13 @@ builder.Services
 
 var app = builder.Build();
 
-app.UseSwagger();
-app.UseSwaggerUI();
-app.MapHealthChecks("/health");
-app.MapGet("/", () => Results.Redirect("/swagger"));
+app.UseSwagger(options => options.RouteTemplate = "docs/{documentName}/swagger.json");
+app.UseSwaggerUI(options =>
+{
+    options.RoutePrefix = "docs";
+    options.SwaggerEndpoint("/docs/v1/swagger.json", "ReleasePilot v1");
+});
+app.MapControllers();
 app.Run();
 
 public partial class Program;
