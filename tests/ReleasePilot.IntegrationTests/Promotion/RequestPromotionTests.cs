@@ -153,7 +153,7 @@ public sealed class RequestPromotionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ApprovesRequestedPromotionWithControlledAuthorization()
+    public async Task ApprovesRequestedPromotionWithControlledErrors()
     {
         client.DefaultRequestHeaders.Add(
             "X-User-Id",
@@ -183,6 +183,16 @@ public sealed class RequestPromotionTests : IAsyncLifetime
         Assert.Equal(
             "promotion_approved",
             details.GetProperty("history")[1].GetProperty("type").GetString());
+
+        var invalidTransition = await client.PostAsync(
+            $"/promotions/{promotionId}/approve",
+            null);
+        Assert.Equal(HttpStatusCode.Conflict, invalidTransition.StatusCode);
+        Assert.Equal(
+            "invalid_promotion_transition",
+            (await invalidTransition.Content.ReadFromJsonAsync<JsonElement>())
+                .GetProperty("code")
+                .GetString());
 
         client.DefaultRequestHeaders.Remove("X-User-Id");
         client.DefaultRequestHeaders.Add(

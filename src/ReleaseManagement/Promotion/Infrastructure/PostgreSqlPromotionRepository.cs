@@ -248,13 +248,16 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
             """
             UPDATE promotions
             SET status = 'approved'
-            WHERE id = $1
+            WHERE id = $1 AND status = 'requested'
             """,
             connection,
             transaction))
         {
             command.Parameters.AddWithValue(promotion.Id.Value);
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
+            {
+                throw new InvalidPromotionTransition();
+            }
         }
 
         var domainEvent = promotion.ApprovedEvent!;

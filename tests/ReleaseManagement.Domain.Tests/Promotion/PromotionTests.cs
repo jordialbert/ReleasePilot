@@ -113,4 +113,25 @@ public sealed class PromotionTests
         Assert.Null(promotion.ApprovedEvent);
     }
 
+    [Fact]
+    public void ApprovedPromotionCannotBeApprovedAgain()
+    {
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            false,
+            Approver,
+            DateTimeOffset.UtcNow);
+        promotion.Approve(Approver, DateTimeOffset.UtcNow);
+        var approvedEvent = promotion.ApprovedEvent;
+
+        var exception = Assert.Throws<InvalidPromotionTransition>(
+            () => promotion.Approve(Approver, DateTimeOffset.UtcNow));
+
+        Assert.Equal("invalid_promotion_transition", exception.Code);
+        Assert.Same(approvedEvent, promotion.ApprovedEvent);
+    }
+
 }
