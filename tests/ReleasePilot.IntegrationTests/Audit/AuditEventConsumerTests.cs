@@ -70,6 +70,7 @@ public sealed class AuditEventConsumerTests
         Assert.Equal(
             processingCancellation.Token,
             queue.CompletionCancellationToken);
+        Assert.Equal(LogLevel.Information, Assert.Single(queue.Logs).Level);
     }
 
     [Fact]
