@@ -1,4 +1,5 @@
 using ReleaseManagement.Application;
+using ReleaseManagement.Domain;
 using ReleaseManagement.Infrastructure;
 using ReleasePilot.Worker;
 
@@ -17,6 +18,10 @@ builder.Services.AddSingleton<IEventDeliveryQueue>(
 builder.Services.AddSingleton<IAuditLogRepository>(
     new PostgreSqlAuditLogRepository(connectionString));
 builder.Services.AddSingleton<AuditEventConsumer>();
+builder.Services.AddSingleton<InMemoryNotificationPort>();
+builder.Services.AddSingleton<INotificationPort>(
+    services => services.GetRequiredService<InMemoryNotificationPort>());
+builder.Services.AddSingleton<NotificationEventConsumer>();
 builder.Services.AddHostedService<Worker>();
 
 var host = builder.Build();

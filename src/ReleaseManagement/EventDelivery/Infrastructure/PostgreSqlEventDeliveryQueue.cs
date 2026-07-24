@@ -69,14 +69,16 @@ public sealed class PostgreSqlEventDeliveryQueue(
         await using var command = new NpgsqlCommand(
             """
             WITH candidate AS (
-                SELECT event_id, consumer
-                FROM event_deliveries
-                WHERE consumer = $1
-                  AND status = 'pending'
-                  AND available_at <= $2
-                  AND (locked_until IS NULL OR locked_until <= $2)
-                  AND attempts < $5
-                ORDER BY available_at, event_id
+                SELECT delivery.event_id, delivery.consumer,
+                       event.promotion_id, event.type
+                FROM event_deliveries delivery
+                JOIN domain_events event ON event.id = delivery.event_id
+                WHERE delivery.consumer = $1
+                  AND delivery.status = 'pending'
+                  AND delivery.available_at <= $2
+                  AND (delivery.locked_until IS NULL OR delivery.locked_until <= $2)
+                  AND delivery.attempts < $5
+                ORDER BY delivery.available_at, delivery.event_id
                 FOR UPDATE SKIP LOCKED
                 LIMIT 1
             )
@@ -87,7 +89,8 @@ public sealed class PostgreSqlEventDeliveryQueue(
             FROM candidate
             WHERE delivery.event_id = candidate.event_id
               AND delivery.consumer = candidate.consumer
-            RETURNING delivery.event_id, delivery.consumer, delivery.attempts
+            RETURNING delivery.event_id, delivery.consumer, delivery.attempts,
+                      candidate.promotion_id, candidate.type
             """,
             connection);
         command.Parameters.AddWithValue(consumer);
@@ -103,6 +106,8 @@ public sealed class PostgreSqlEventDeliveryQueue(
 
         return new EventDelivery(
             new DomainEventId(reader.GetGuid(0)),
+            new PromotionId(reader.GetGuid(3)),
+            reader.GetString(4),
             reader.GetString(1),
             reader.GetInt32(2),
             claimToken);

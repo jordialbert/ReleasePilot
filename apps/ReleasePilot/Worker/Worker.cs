@@ -5,6 +5,7 @@ namespace ReleasePilot.Worker;
 
 public sealed class Worker(
     AuditEventConsumer audit,
+    NotificationEventConsumer notifications,
     TimeProvider timeProvider,
     IOptions<HostOptions> hostOptions,
     ILogger<Worker> logger)
@@ -24,9 +25,13 @@ public sealed class Worker(
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                if (!await audit.ProcessNext(
-                        stoppingToken,
-                        processingCancellation.Token))
+                var auditProcessed = await audit.ProcessNext(
+                    stoppingToken,
+                    processingCancellation.Token);
+                var notificationProcessed = await notifications.ProcessNext(
+                    stoppingToken,
+                    processingCancellation.Token);
+                if (!auditProcessed && !notificationProcessed)
                 {
                     await Task.Delay(
                         TimeSpan.FromMilliseconds(500),
