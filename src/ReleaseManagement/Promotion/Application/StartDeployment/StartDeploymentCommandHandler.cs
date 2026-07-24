@@ -11,21 +11,12 @@ public sealed class StartDeploymentCommandHandler(
         StartDeploymentCommand command,
         CancellationToken cancellationToken)
     {
-        var actor = await users.Find(
-            new UserId(command.ActorId),
+        var (actor, promotion) = await PromotionCommandContext.Load(
+            users,
+            promotions,
+            command.ActorId,
+            command.PromotionId,
             cancellationToken);
-        if (actor is null)
-        {
-            throw new UnknownActor();
-        }
-
-        var promotion = await promotions.Find(
-            new PromotionId(command.PromotionId),
-            cancellationToken);
-        if (promotion is null)
-        {
-            throw new ResourceNotFound("promotion");
-        }
 
         promotion.StartDeployment(actor, DateTimeOffset.UtcNow);
         try
