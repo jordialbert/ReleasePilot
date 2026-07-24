@@ -154,6 +154,22 @@ public sealed class Promotion
             actor.Id);
     }
 
+    public void Cancel(Actor actor, DateTimeOffset cancelledAt)
+    {
+        EnsureNotTerminal();
+        if (Status is not PromotionStatus.Requested and not PromotionStatus.Approved)
+        {
+            throw new InvalidPromotionTransition();
+        }
+
+        Status = PromotionStatus.Cancelled;
+        UncommittedEvent = new PromotionCancelled(
+            new DomainEventId(Guid.CreateVersion7()),
+            Id,
+            cancelledAt,
+            actor.Id);
+    }
+
     private void EnsureNotTerminal()
     {
         if (Status.IsTerminal())

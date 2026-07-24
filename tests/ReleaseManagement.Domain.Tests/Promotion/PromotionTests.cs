@@ -228,7 +228,84 @@ public sealed class PromotionTests
             () => promotion.StartDeployment(Actor, DateTimeOffset.UtcNow));
         Assert.Throws<TerminalPromotionIsImmutable>(
             () => promotion.Complete(Actor, DateTimeOffset.UtcNow));
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.Cancel(Actor, DateTimeOffset.UtcNow));
         Assert.Equal(PromotionStatus.Completed, promotion.Status);
+        Assert.Same(uncommittedEvent, promotion.UncommittedEvent);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CancelsPromotionBeforeDeploymentAndRecordsItsEvent(bool approved)
+    {
+        var cancelledAt = DateTimeOffset.Parse("2026-07-23T12:10:00Z");
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            false,
+            Actor,
+            DateTimeOffset.Parse("2026-07-23T12:00:00Z"));
+        if (approved)
+        {
+            promotion.Approve(Approver, DateTimeOffset.Parse("2026-07-23T12:05:00Z"));
+        }
+
+        promotion.Cancel(Actor, cancelledAt);
+
+        Assert.Equal(PromotionStatus.Cancelled, promotion.Status);
+        var domainEvent = Assert.IsType<PromotionCancelled>(promotion.UncommittedEvent);
+        Assert.Equal(promotion.Id, domainEvent.PromotionId);
+        Assert.Equal(Actor.Id, domainEvent.ActorId);
+        Assert.Equal(cancelledAt, domainEvent.OccurredAt);
+    }
+
+    [Fact]
+    public void DeployingPromotionCannotBeCancelled()
+    {
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            false,
+            Actor,
+            DateTimeOffset.UtcNow);
+        promotion.Approve(Approver, DateTimeOffset.UtcNow);
+        promotion.StartDeployment(Actor, DateTimeOffset.UtcNow);
+        var uncommittedEvent = promotion.UncommittedEvent;
+
+        Assert.Throws<InvalidPromotionTransition>(
+            () => promotion.Cancel(Actor, DateTimeOffset.UtcNow));
+        Assert.Equal(PromotionStatus.Deploying, promotion.Status);
+        Assert.Same(uncommittedEvent, promotion.UncommittedEvent);
+    }
+
+    [Fact]
+    public void CancelledPromotionRejectsEveryLaterTransition()
+    {
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            false,
+            Actor,
+            DateTimeOffset.UtcNow);
+        promotion.Cancel(Actor, DateTimeOffset.UtcNow);
+        var uncommittedEvent = promotion.UncommittedEvent;
+
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.Approve(Approver, DateTimeOffset.UtcNow));
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.StartDeployment(Actor, DateTimeOffset.UtcNow));
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.Complete(Actor, DateTimeOffset.UtcNow));
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.Cancel(Actor, DateTimeOffset.UtcNow));
+        Assert.Equal(PromotionStatus.Cancelled, promotion.Status);
         Assert.Same(uncommittedEvent, promotion.UncommittedEvent);
     }
 
