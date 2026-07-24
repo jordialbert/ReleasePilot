@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using ReleaseManagement.Application;
 using ReleaseManagement.Domain;
 
@@ -21,7 +22,8 @@ public sealed class AuditEventConsumerTests
         var consumer = new AuditEventConsumer(
             queue,
             auditLog,
-            TimeProvider.System);
+            TimeProvider.System,
+            queue);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => consumer.ProcessNext(
@@ -49,7 +51,8 @@ public sealed class AuditEventConsumerTests
         var consumer = new AuditEventConsumer(
             queue,
             auditLog,
-            TimeProvider.System);
+            TimeProvider.System,
+            queue);
 
         Assert.True(
             await consumer.ProcessNext(
@@ -65,13 +68,79 @@ public sealed class AuditEventConsumerTests
             queue.CompletionCancellationToken);
     }
 
+    [Fact]
+    public async Task LogsFailuresAndLostFailureAcknowledgements()
+    {
+        var exception = new InvalidOperationException("Audit insert failed");
+        var delivery = new EventDelivery(
+            new DomainEventId(Guid.CreateVersion7()),
+            AuditEventConsumer.ConsumerName,
+            5,
+            Guid.CreateVersion7());
+        var queue = new RecordingQueue(delivery, static () => { })
+        {
+            FailResult = false
+        };
+        var consumer = new AuditEventConsumer(
+            queue,
+            new RecordingAuditLog { Exception = exception },
+            TimeProvider.System,
+            queue);
+
+        Assert.True(
+            await consumer.ProcessNext(
+                CancellationToken.None,
+                CancellationToken.None));
+
+        Assert.Equal(exception.Message, queue.FailureError);
+        Assert.Collection(
+            queue.Logs,
+            log =>
+            {
+                Assert.Equal(LogLevel.Error, log.Level);
+                Assert.Same(exception, log.Exception);
+            },
+            log => Assert.Equal(LogLevel.Warning, log.Level));
+    }
+
+    [Fact]
+    public async Task LogsLostCompletionAcknowledgements()
+    {
+        var delivery = new EventDelivery(
+            new DomainEventId(Guid.CreateVersion7()),
+            AuditEventConsumer.ConsumerName,
+            5,
+            Guid.CreateVersion7());
+        var queue = new RecordingQueue(delivery, static () => { })
+        {
+            CompleteResult = false
+        };
+        var consumer = new AuditEventConsumer(
+            queue,
+            new RecordingAuditLog(),
+            TimeProvider.System,
+            queue);
+
+        Assert.True(
+            await consumer.ProcessNext(
+                CancellationToken.None,
+                CancellationToken.None));
+
+        var log = Assert.Single(queue.Logs);
+        Assert.Equal(LogLevel.Warning, log.Level);
+    }
+
     private sealed class RecordingQueue(
         EventDelivery delivery,
         Action onClaim)
-        : IEventDeliveryQueue
+        : IEventDeliveryQueue, ILogger<AuditEventConsumer>
     {
         public Exception? CompleteException { get; init; }
+        public bool CompleteResult { get; init; } = true;
+        public bool FailResult { get; init; } = true;
         public bool Failed { get; private set; }
+        public string? FailureError { get; private set; }
+        public List<(LogLevel Level, Exception? Exception)> Logs { get; } = [];
         public CancellationToken CompletionCancellationToken { get; private set; }
 
         public Task<EventDelivery?> Claim(
@@ -92,7 +161,7 @@ public sealed class AuditEventConsumerTests
                 return Task.FromException<bool>(CompleteException);
             }
 
-            return Task.FromResult(true);
+            return Task.FromResult(CompleteResult);
         }
 
         public Task<bool> Fail(
@@ -101,12 +170,28 @@ public sealed class AuditEventConsumerTests
             CancellationToken cancellationToken)
         {
             Failed = true;
-            return Task.FromResult(true);
+            FailureError = error;
+            return Task.FromResult(FailResult);
         }
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull =>
+            null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter) =>
+            Logs.Add((logLevel, exception));
     }
 
     private sealed class RecordingAuditLog : IAuditLogRepository
     {
+        public Exception? Exception { get; init; }
         public bool Added { get; private set; }
         public CancellationToken CancellationToken { get; private set; }
 
@@ -115,6 +200,11 @@ public sealed class AuditEventConsumerTests
             DateTimeOffset recordedAt,
             CancellationToken cancellationToken)
         {
+            if (Exception is not null)
+            {
+                return Task.FromException(Exception);
+            }
+
             Added = true;
             CancellationToken = cancellationToken;
             return Task.CompletedTask;

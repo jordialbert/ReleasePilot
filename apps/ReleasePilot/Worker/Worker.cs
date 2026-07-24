@@ -17,7 +17,7 @@ public sealed class Worker(
         using var processingCancellation = new CancellationTokenSource();
         using var stoppingRegistration = stoppingToken.Register(
             () => processingCancellation.CancelAfter(
-                hostOptions.Value.ShutdownTimeout));
+                hostOptions.Value.ShutdownTimeout - TimeSpan.FromSeconds(1)));
 
         // Infrastructure failures stop the host so Docker can restart the process.
         try
@@ -36,6 +36,7 @@ public sealed class Worker(
             }
         }
         catch (OperationCanceledException)
+            when (stoppingToken.IsCancellationRequested)
         {
             logger.LogInformation("ReleasePilot worker stopping");
         }

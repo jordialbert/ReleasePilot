@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using ReleaseManagement.Application;
 using ReleaseManagement.Domain;
@@ -13,7 +14,7 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
     private const string ApproverId = "01900000-0000-7000-8000-000000000001";
     private const string VersionId = "01900000-0000-7000-8000-000000000201";
     private static readonly DateTimeOffset AuditTime =
-        new(2030, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        DateTimeOffset.UtcNow.AddYears(1);
 
     [Fact]
     public async Task ClaimsConcurrentlyAndRejectsStaleTokensAfterLeaseExpiry()
@@ -23,7 +24,8 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
         var time = new AdjustableTimeProvider(AuditTime);
         var queue = new PostgreSqlEventDeliveryQueue(
             Database.GetConnectionString(),
-            time);
+            time,
+            NullLogger<PostgreSqlEventDeliveryQueue>.Instance);
 
         var claims = await Task.WhenAll(
             queue.Claim(AuditEventConsumer.ConsumerName, CancellationToken.None),
@@ -82,7 +84,8 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
         var time = new AdjustableTimeProvider(AuditTime);
         var queue = new PostgreSqlEventDeliveryQueue(
             Database.GetConnectionString(),
-            time);
+            time,
+            NullLogger<PostgreSqlEventDeliveryQueue>.Instance);
         int[] retryDelays = [5, 10, 20, 30];
 
         for (var index = 0; index < retryDelays.Length; index++)
@@ -146,7 +149,8 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
         var time = new AdjustableTimeProvider(AuditTime);
         var queue = new PostgreSqlEventDeliveryQueue(
             Database.GetConnectionString(),
-            time);
+            time,
+            NullLogger<PostgreSqlEventDeliveryQueue>.Instance);
         int[] retryDelays = [5, 10, 20, 30];
 
         foreach (var retryDelay in retryDelays)
@@ -209,10 +213,15 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
         var time = new AdjustableTimeProvider(AuditTime);
         var queue = new PostgreSqlEventDeliveryQueue(
             Database.GetConnectionString(),
-            time);
+            time,
+            NullLogger<PostgreSqlEventDeliveryQueue>.Instance);
         var auditLog =
             new PostgreSqlAuditLogRepository(Database.GetConnectionString());
-        var consumer = new AuditEventConsumer(queue, auditLog, time);
+        var consumer = new AuditEventConsumer(
+            queue,
+            auditLog,
+            time,
+            NullLogger<AuditEventConsumer>.Instance);
 
         while (await consumer.ProcessNext(
                    CancellationToken.None,
@@ -281,10 +290,15 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
         var time = new AdjustableTimeProvider(AuditTime);
         var queue = new PostgreSqlEventDeliveryQueue(
             Database.GetConnectionString(),
-            time);
+            time,
+            NullLogger<PostgreSqlEventDeliveryQueue>.Instance);
         var auditLog =
             new PostgreSqlAuditLogRepository(Database.GetConnectionString());
-        var consumer = new AuditEventConsumer(queue, auditLog, time);
+        var consumer = new AuditEventConsumer(
+            queue,
+            auditLog,
+            time,
+            NullLogger<AuditEventConsumer>.Instance);
         Assert.True(
             await consumer.ProcessNext(
                 CancellationToken.None,

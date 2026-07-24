@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using ReleaseManagement.Application;
@@ -7,7 +8,8 @@ namespace ReleaseManagement.Infrastructure;
 
 public sealed class PostgreSqlEventDeliveryQueue(
     string connectionString,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<PostgreSqlEventDeliveryQueue> logger)
     : IEventDeliveryQueue
 {
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromSeconds(60);
@@ -54,7 +56,14 @@ public sealed class PostgreSqlEventDeliveryQueue(
             expiredCommand.Parameters.AddWithValue(consumer);
             expiredCommand.Parameters.AddWithValue(now);
             expiredCommand.Parameters.AddWithValue(MaxAttempts);
-            await expiredCommand.ExecuteNonQueryAsync(cancellationToken);
+            var expired = await expiredCommand.ExecuteNonQueryAsync(cancellationToken);
+            if (expired > 0)
+            {
+                logger.LogError(
+                    "{ExpiredDeliveryCount} {Consumer} deliveries failed after their final lease expired",
+                    expired,
+                    consumer);
+            }
         }
 
         await using var command = new NpgsqlCommand(
@@ -168,6 +177,17 @@ public sealed class PostgreSqlEventDeliveryQueue(
         command.Parameters.AddWithValue(NpgsqlDbType.TimestampTz, finishedAt);
         command.Parameters.AddWithValue(NpgsqlDbType.TimestampTz, retryAt);
         command.Parameters.AddWithValue(error);
-        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+        var acknowledged =
+            await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+        if (terminal && acknowledged)
+        {
+            logger.LogError(
+                "Delivery {EventId} for {Consumer} failed permanently after {AttemptCount} attempts",
+                delivery.EventId.Value,
+                delivery.Consumer,
+                delivery.Attempt);
+        }
+
+        return acknowledged;
     }
 }

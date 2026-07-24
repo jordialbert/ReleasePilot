@@ -12,7 +12,8 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IEventDeliveryQueue>(
     services => new PostgreSqlEventDeliveryQueue(
         connectionString,
-        services.GetRequiredService<TimeProvider>()));
+        services.GetRequiredService<TimeProvider>(),
+        services.GetRequiredService<ILogger<PostgreSqlEventDeliveryQueue>>()));
 builder.Services.AddSingleton<IAuditLogRepository>(
     new PostgreSqlAuditLogRepository(connectionString));
 builder.Services.AddSingleton<AuditEventConsumer>();

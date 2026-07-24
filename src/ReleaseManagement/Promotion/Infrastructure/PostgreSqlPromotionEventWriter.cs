@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Npgsql;
 using NpgsqlTypes;
+using ReleaseManagement.Application;
 using ReleaseManagement.Domain;
 
 namespace ReleaseManagement.Infrastructure;
@@ -25,27 +26,27 @@ internal static class PostgreSqlPromotionEventWriter
                     targetEnvironment =
                         requested.TargetEnvironment.ToString().ToLowerInvariant()
                 }),
-                Consumers: new[] { "audit" }),
+                Consumers: new[] { EventDelivery.AuditConsumer }),
             PromotionApproved => (
                 Type: "promotion_approved",
                 Payload: "{}",
-                Consumers: new[] { "audit", "release_notes" }),
+                Consumers: new[] { EventDelivery.AuditConsumer, "release_notes" }),
             DeploymentStarted => (
                 Type: "deployment_started",
                 Payload: "{}",
-                Consumers: new[] { "audit" }),
+                Consumers: new[] { EventDelivery.AuditConsumer }),
             PromotionCompleted => (
                 Type: "promotion_completed",
                 Payload: "{}",
-                Consumers: new[] { "audit", "notification" }),
+                Consumers: new[] { EventDelivery.AuditConsumer, "notification" }),
             PromotionRolledBack => (
                 Type: "promotion_rolled_back",
                 Payload: "{}",
-                Consumers: new[] { "audit", "notification" }),
+                Consumers: new[] { EventDelivery.AuditConsumer, "notification" }),
             PromotionCancelled => (
                 Type: "promotion_cancelled",
                 Payload: "{}",
-                Consumers: new[] { "audit", "notification" }),
+                Consumers: new[] { EventDelivery.AuditConsumer, "notification" }),
             _ => throw new UnreachableException()
         };
         await using (var command = new NpgsqlCommand(

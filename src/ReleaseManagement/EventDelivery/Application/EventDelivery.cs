@@ -6,4 +6,7 @@ public sealed record EventDelivery(
     DomainEventId EventId,
     string Consumer,
     int Attempt,
-    Guid ClaimToken);
+    Guid ClaimToken)
+{
+    public const string AuditConsumer = "audit";
+}

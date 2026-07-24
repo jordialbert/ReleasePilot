@@ -1,11 +1,14 @@
+using Microsoft.Extensions.Logging;
+
 namespace ReleaseManagement.Application;
 
 public sealed class AuditEventConsumer(
     IEventDeliveryQueue deliveries,
     IAuditLogRepository auditLog,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<AuditEventConsumer> logger)
 {
-    public const string ConsumerName = "audit";
+    public const string ConsumerName = EventDelivery.AuditConsumer;
 
     public async Task<bool> ProcessNext(
         CancellationToken claimCancellationToken,
@@ -33,14 +36,29 @@ public sealed class AuditEventConsumer(
         }
         catch (Exception exception)
         {
-            await deliveries.Fail(
+            logger.LogError(
+                exception,
+                "Audit delivery {EventId} failed on attempt {Attempt}",
+                delivery.EventId.Value,
+                delivery.Attempt);
+            if (!await deliveries.Fail(
                 delivery,
-                exception.ToString(),
-                processingCancellationToken);
+                exception.Message,
+                processingCancellationToken))
+            {
+                logger.LogWarning(
+                    "Audit delivery {EventId} lost its lease before failure acknowledgement",
+                    delivery.EventId.Value);
+            }
             return true;
         }
 
-        await deliveries.Complete(delivery, processingCancellationToken);
+        if (!await deliveries.Complete(delivery, processingCancellationToken))
+        {
+            logger.LogWarning(
+                "Audit delivery {EventId} lost its lease before completion acknowledgement",
+                delivery.EventId.Value);
+        }
         return true;
     }
 }
