@@ -27,6 +27,11 @@ public sealed class ProblemDetailsExceptionHandler : IExceptionHandler
                 code = invalidInput.Code;
                 title = invalidInput.Message;
                 break;
+            case MissingActor missingActor:
+                status = StatusCodes.Status401Unauthorized;
+                code = missingActor.Code;
+                title = missingActor.Message;
+                break;
             case UnknownActor unknownActor:
                 status = StatusCodes.Status401Unauthorized;
                 code = unknownActor.Code;
