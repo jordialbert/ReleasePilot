@@ -60,7 +60,16 @@ public abstract class EventConsumer(
                 "{Consumer} delivery {EventId} lost its lease before completion acknowledgement",
                 ConsumerName,
                 delivery.EventId.Value);
+            return true;
         }
+
+        logger.LogInformation(
+            "{Consumer} delivery {EventId} for Promotion {PromotionId} ({EventType}) completed on attempt {Attempt}",
+            ConsumerName,
+            delivery.EventId.Value,
+            delivery.PromotionId.Value,
+            delivery.EventType,
+            delivery.Attempt);
         return true;
     }
 }
