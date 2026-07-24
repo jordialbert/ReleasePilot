@@ -11,6 +11,7 @@ public sealed class PromotionsController(
     ApprovePromotionCommandHandler approvePromotion,
     StartDeploymentCommandHandler startDeployment,
     CompletePromotionCommandHandler completePromotion,
+    CancelPromotionCommandHandler cancelPromotion,
     GetPromotionDetailsQueryHandler getPromotionDetails) : ControllerBase
 {
     [HttpPost]
@@ -75,6 +76,21 @@ public sealed class PromotionsController(
 
         await completePromotion.Handle(
             new CompletePromotionCommand(promotionId, actorId),
+            cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("{id}/cancel")]
+    public async Task<IActionResult> CancelPromotion(
+        string id,
+        [FromHeader(Name = "X-User-Id")] string? actorHeader,
+        CancellationToken cancellationToken)
+    {
+        var actorId = RequiredActor.Parse(actorHeader);
+        var promotionId = ParsePromotionId(id);
+
+        await cancelPromotion.Handle(
+            new CancelPromotionCommand(promotionId, actorId),
             cancellationToken);
         return NoContent();
     }
