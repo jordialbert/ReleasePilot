@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Npgsql;
@@ -12,6 +13,20 @@ var connectionString = builder.Configuration["ConnectionStrings:PostgreSQL"]!;
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole();
 builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));
+builder.Services.AddHttpLogging(options =>
+{
+    options.LoggingFields =
+        HttpLoggingFields.RequestMethod
+        | HttpLoggingFields.RequestPath
+        | HttpLoggingFields.RequestQuery
+        | HttpLoggingFields.RequestBody
+        | HttpLoggingFields.ResponseStatusCode
+        | HttpLoggingFields.ResponseBody
+        | HttpLoggingFields.Duration;
+    options.RequestBodyLogLimit = 4096;
+    options.ResponseBodyLogLimit = 4096;
+    options.CombineLogs = true;
+});
 builder.Services
     .AddControllers()
     .ConfigureApiBehaviorOptions(options =>
@@ -90,6 +105,7 @@ builder.Services
 
 var app = builder.Build();
 
+app.UseHttpLogging();
 app.UseExceptionHandler();
 app.UseSwagger(options => options.RouteTemplate = "docs/{documentName}/swagger.json");
 app.UseSwaggerUI(options =>
