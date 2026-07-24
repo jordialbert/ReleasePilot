@@ -167,6 +167,19 @@ public sealed class Promotion
             actor.Id);
     }
 
+    public void Rollback(Actor actor, DateTimeOffset rolledBackAt)
+    {
+        EnsureNotTerminal();
+        EnsureStatus(PromotionStatus.Deploying);
+
+        Status = PromotionStatus.RolledBack;
+        UncommittedEvent = new PromotionRolledBack(
+            new DomainEventId(Guid.CreateVersion7()),
+            Id,
+            rolledBackAt,
+            actor.Id);
+    }
+
     private void EnsureNotTerminal()
     {
         if (Status.IsTerminal())

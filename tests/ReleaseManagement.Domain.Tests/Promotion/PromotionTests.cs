@@ -230,6 +230,8 @@ public sealed class PromotionTests
             () => promotion.Complete(Actor, DateTimeOffset.UtcNow));
         Assert.Throws<TerminalPromotionIsImmutable>(
             () => promotion.Cancel(Actor, DateTimeOffset.UtcNow));
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.Rollback(Actor, DateTimeOffset.UtcNow));
         Assert.Equal(PromotionStatus.Completed, promotion.Status);
         Assert.Same(uncommittedEvent, promotion.UncommittedEvent);
     }
@@ -305,7 +307,87 @@ public sealed class PromotionTests
             () => promotion.Complete(Actor, DateTimeOffset.UtcNow));
         Assert.Throws<TerminalPromotionIsImmutable>(
             () => promotion.Cancel(Actor, DateTimeOffset.UtcNow));
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.Rollback(Actor, DateTimeOffset.UtcNow));
         Assert.Equal(PromotionStatus.Cancelled, promotion.Status);
+        Assert.Same(uncommittedEvent, promotion.UncommittedEvent);
+    }
+
+    [Fact]
+    public void RollsBackDeployingPromotionAndRecordsItsEvent()
+    {
+        var rolledBackAt = DateTimeOffset.Parse("2026-07-23T12:15:00Z");
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            false,
+            Approver,
+            DateTimeOffset.Parse("2026-07-23T12:00:00Z"));
+        promotion.Approve(Approver, DateTimeOffset.Parse("2026-07-23T12:05:00Z"));
+        promotion.StartDeployment(Actor, DateTimeOffset.Parse("2026-07-23T12:10:00Z"));
+
+        promotion.Rollback(Actor, rolledBackAt);
+
+        Assert.Equal(PromotionStatus.RolledBack, promotion.Status);
+        var domainEvent = Assert.IsType<PromotionRolledBack>(promotion.UncommittedEvent);
+        Assert.Equal(promotion.Id, domainEvent.PromotionId);
+        Assert.Equal(Actor.Id, domainEvent.ActorId);
+        Assert.Equal(rolledBackAt, domainEvent.OccurredAt);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PromotionCannotBeRolledBackBeforeDeployment(bool approved)
+    {
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            false,
+            Approver,
+            DateTimeOffset.UtcNow);
+        if (approved)
+        {
+            promotion.Approve(Approver, DateTimeOffset.UtcNow);
+        }
+        var uncommittedEvent = promotion.UncommittedEvent;
+
+        Assert.Throws<InvalidPromotionTransition>(
+            () => promotion.Rollback(Actor, DateTimeOffset.UtcNow));
+        Assert.Same(uncommittedEvent, promotion.UncommittedEvent);
+    }
+
+    [Fact]
+    public void RolledBackPromotionRejectsEveryLaterTransition()
+    {
+        var promotion = Promotion.Request(
+            new PromotionId(Guid.CreateVersion7()),
+            Version,
+            DeploymentEnvironment.Dev,
+            null,
+            false,
+            Approver,
+            DateTimeOffset.UtcNow);
+        promotion.Approve(Approver, DateTimeOffset.UtcNow);
+        promotion.StartDeployment(Actor, DateTimeOffset.UtcNow);
+        promotion.Rollback(Actor, DateTimeOffset.UtcNow);
+        var uncommittedEvent = promotion.UncommittedEvent;
+
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.Approve(Approver, DateTimeOffset.UtcNow));
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.StartDeployment(Actor, DateTimeOffset.UtcNow));
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.Complete(Actor, DateTimeOffset.UtcNow));
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.Cancel(Actor, DateTimeOffset.UtcNow));
+        Assert.Throws<TerminalPromotionIsImmutable>(
+            () => promotion.Rollback(Actor, DateTimeOffset.UtcNow));
+        Assert.Equal(PromotionStatus.RolledBack, promotion.Status);
         Assert.Same(uncommittedEvent, promotion.UncommittedEvent);
     }
 
