@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ReleaseManagement.Application;
+using ReleasePilot.Api.Shared;
 
 namespace ReleasePilot.Api.Promotion;
 
@@ -9,6 +10,7 @@ public sealed class PromotionsController(
     RequestPromotionCommandHandler requestPromotion,
     ApprovePromotionCommandHandler approvePromotion,
     StartDeploymentCommandHandler startDeployment,
+    CompletePromotionCommandHandler completePromotion,
     GetPromotionDetailsQueryHandler getPromotionDetails) : ControllerBase
 {
     [HttpPost]
@@ -17,23 +19,7 @@ public sealed class PromotionsController(
         RequestPromotionRequest request,
         CancellationToken cancellationToken)
     {
-        if (actorHeader is null)
-        {
-            var problem = new ProblemDetails
-            {
-                Status = StatusCodes.Status401Unauthorized,
-                Title = "The X-User-Id header is required."
-            };
-            problem.Extensions["code"] = "missing_actor";
-            problem.Extensions["traceId"] = HttpContext.TraceIdentifier;
-            return Unauthorized(problem);
-        }
-
-        if (!Guid.TryParse(actorHeader, out var actorId))
-        {
-            throw new InvalidInput("X-User-Id");
-        }
-
+        var actorId = RequiredActor.Parse(actorHeader);
         if (request.ApplicationVersionId == Guid.Empty)
         {
             throw new InvalidInput("applicationVersionId");
@@ -54,27 +40,8 @@ public sealed class PromotionsController(
         [FromHeader(Name = "X-User-Id")] string? actorHeader,
         CancellationToken cancellationToken)
     {
-        if (actorHeader is null)
-        {
-            var problem = new ProblemDetails
-            {
-                Status = StatusCodes.Status401Unauthorized,
-                Title = "The X-User-Id header is required."
-            };
-            problem.Extensions["code"] = "missing_actor";
-            problem.Extensions["traceId"] = HttpContext.TraceIdentifier;
-            return Unauthorized(problem);
-        }
-
-        if (!Guid.TryParse(actorHeader, out var actorId))
-        {
-            throw new InvalidInput("X-User-Id");
-        }
-
-        if (!Guid.TryParse(id, out var promotionId))
-        {
-            throw new InvalidInput("id");
-        }
+        var actorId = RequiredActor.Parse(actorHeader);
+        var promotionId = ParsePromotionId(id);
 
         await approvePromotion.Handle(
             new ApprovePromotionCommand(promotionId, actorId),
@@ -88,30 +55,26 @@ public sealed class PromotionsController(
         [FromHeader(Name = "X-User-Id")] string? actorHeader,
         CancellationToken cancellationToken)
     {
-        if (actorHeader is null)
-        {
-            var problem = new ProblemDetails
-            {
-                Status = StatusCodes.Status401Unauthorized,
-                Title = "The X-User-Id header is required."
-            };
-            problem.Extensions["code"] = "missing_actor";
-            problem.Extensions["traceId"] = HttpContext.TraceIdentifier;
-            return Unauthorized(problem);
-        }
-
-        if (!Guid.TryParse(actorHeader, out var actorId))
-        {
-            throw new InvalidInput("X-User-Id");
-        }
-
-        if (!Guid.TryParse(id, out var promotionId))
-        {
-            throw new InvalidInput("id");
-        }
+        var actorId = RequiredActor.Parse(actorHeader);
+        var promotionId = ParsePromotionId(id);
 
         await startDeployment.Handle(
             new StartDeploymentCommand(promotionId, actorId),
+            cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("{id}/complete")]
+    public async Task<IActionResult> CompletePromotion(
+        string id,
+        [FromHeader(Name = "X-User-Id")] string? actorHeader,
+        CancellationToken cancellationToken)
+    {
+        var actorId = RequiredActor.Parse(actorHeader);
+        var promotionId = ParsePromotionId(id);
+
+        await completePromotion.Handle(
+            new CompletePromotionCommand(promotionId, actorId),
             cancellationToken);
         return NoContent();
     }
@@ -121,11 +84,16 @@ public sealed class PromotionsController(
         string id,
         CancellationToken cancellationToken)
     {
+        return await getPromotionDetails.Handle(ParsePromotionId(id), cancellationToken);
+    }
+
+    private static Guid ParsePromotionId(string id)
+    {
         if (!Guid.TryParse(id, out var promotionId))
         {
             throw new InvalidInput("id");
         }
 
-        return await getPromotionDetails.Handle(promotionId, cancellationToken);
+        return promotionId;
     }
 }

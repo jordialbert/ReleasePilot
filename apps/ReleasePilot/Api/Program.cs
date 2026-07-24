@@ -44,14 +44,18 @@ builder.Services.AddSingleton<IApplicationRepository>(
     new PostgreSqlApplicationRepository(connectionString));
 builder.Services.AddSingleton<IApplicationVersionRepository>(
     new PostgreSqlApplicationVersionRepository(connectionString));
+builder.Services.AddSingleton<IApplicationStatusReader>(
+    new PostgreSqlApplicationStatusReader(connectionString));
 builder.Services.AddSingleton<InMemoryDeploymentPort>();
 builder.Services.AddSingleton<IDeploymentPort>(
     services => services.GetRequiredService<InMemoryDeploymentPort>());
 builder.Services.AddScoped<RequestPromotionCommandHandler>();
 builder.Services.AddScoped<ApprovePromotionCommandHandler>();
 builder.Services.AddScoped<StartDeploymentCommandHandler>();
+builder.Services.AddScoped<CompletePromotionCommandHandler>();
 builder.Services.AddScoped<GetPromotionDetailsQueryHandler>();
 builder.Services.AddScoped<ListPromotionsQueryHandler>();
+builder.Services.AddScoped<GetApplicationStatusQueryHandler>();
 builder.Services
     .AddHealthChecks()
     .AddCheck("postgresql", () =>

@@ -17,6 +17,7 @@ public sealed class Promotion
         RequestedBy = requestedBy;
         RequestedAt = requestedAt;
         Status = PromotionStatus.Requested;
+        CommittedStatus = PromotionStatus.Requested;
         UncommittedEvent = new PromotionRequested(
             new DomainEventId(Guid.CreateVersion7()),
             id,
@@ -34,15 +35,18 @@ public sealed class Promotion
         DeploymentEnvironment targetEnvironment,
         PromotionStatus status,
         UserId requestedBy,
-        DateTimeOffset requestedAt)
+        DateTimeOffset requestedAt,
+        DateTimeOffset? completedAt)
     {
         Id = id;
         ApplicationId = applicationId;
         ApplicationVersionId = applicationVersionId;
         TargetEnvironment = targetEnvironment;
         Status = status;
+        CommittedStatus = status;
         RequestedBy = requestedBy;
         RequestedAt = requestedAt;
+        CompletedAt = completedAt;
     }
 
     public PromotionId Id { get; }
@@ -50,8 +54,10 @@ public sealed class Promotion
     public ApplicationVersionId ApplicationVersionId { get; }
     public DeploymentEnvironment TargetEnvironment { get; }
     public PromotionStatus Status { get; private set; }
+    public PromotionStatus CommittedStatus { get; }
     public UserId RequestedBy { get; }
     public DateTimeOffset RequestedAt { get; }
+    public DateTimeOffset? CompletedAt { get; private set; }
     public PromotionDomainEvent? UncommittedEvent { get; private set; }
 
     public static Promotion Request(
@@ -105,15 +111,13 @@ public sealed class Promotion
 
     public void Approve(Actor actor, DateTimeOffset approvedAt)
     {
+        EnsureNotTerminal();
         if (actor.Role != UserRole.Approver)
         {
             throw new OnlyApproverCanApprove();
         }
 
-        if (Status != PromotionStatus.Requested)
-        {
-            throw new InvalidPromotionTransition();
-        }
+        EnsureStatus(PromotionStatus.Requested);
 
         Status = PromotionStatus.Approved;
         UncommittedEvent = new PromotionApproved(
@@ -125,10 +129,8 @@ public sealed class Promotion
 
     public void StartDeployment(Actor actor, DateTimeOffset startedAt)
     {
-        if (Status != PromotionStatus.Approved)
-        {
-            throw new InvalidPromotionTransition();
-        }
+        EnsureNotTerminal();
+        EnsureStatus(PromotionStatus.Approved);
 
         Status = PromotionStatus.Deploying;
         UncommittedEvent = new DeploymentStarted(
@@ -136,5 +138,35 @@ public sealed class Promotion
             Id,
             startedAt,
             actor.Id);
+    }
+
+    public void Complete(Actor actor, DateTimeOffset completedAt)
+    {
+        EnsureNotTerminal();
+        EnsureStatus(PromotionStatus.Deploying);
+
+        Status = PromotionStatus.Completed;
+        CompletedAt = completedAt;
+        UncommittedEvent = new PromotionCompleted(
+            new DomainEventId(Guid.CreateVersion7()),
+            Id,
+            completedAt,
+            actor.Id);
+    }
+
+    private void EnsureNotTerminal()
+    {
+        if (Status.IsTerminal())
+        {
+            throw new TerminalPromotionIsImmutable();
+        }
+    }
+
+    private void EnsureStatus(PromotionStatus expected)
+    {
+        if (Status != expected)
+        {
+            throw new InvalidPromotionTransition();
+        }
     }
 }

@@ -6,7 +6,8 @@ namespace ReleasePilot.Api.Application;
 [ApiController]
 [Route("applications")]
 public sealed class ApplicationsController(
-    ListPromotionsQueryHandler listPromotions) : ControllerBase
+    ListPromotionsQueryHandler listPromotions,
+    GetApplicationStatusQueryHandler getApplicationStatus) : ControllerBase
 {
     [HttpGet("{id}/promotions")]
     public async Task<ActionResult<PromotionListPageResponse>> ListPromotions(
@@ -41,5 +42,18 @@ public sealed class ApplicationsController(
                 PageSize: pageSize,
                 Snapshot: snapshot),
             cancellationToken);
+    }
+
+    [HttpGet("{id}/status")]
+    public async Task<ActionResult<ApplicationStatusResponse>> GetApplicationStatus(
+        string id,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(id, out var applicationId))
+        {
+            throw new InvalidInput("id");
+        }
+
+        return await getApplicationStatus.Handle(applicationId, cancellationToken);
     }
 }

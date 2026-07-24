@@ -2,12 +2,12 @@ using ReleaseManagement.Domain;
 
 namespace ReleaseManagement.Application;
 
-public sealed class ApprovePromotionCommandHandler(
+public sealed class CompletePromotionCommandHandler(
     IUserRepository users,
     IPromotionRepository promotions)
 {
     public async Task Handle(
-        ApprovePromotionCommand command,
+        CompletePromotionCommand command,
         CancellationToken cancellationToken)
     {
         var (actor, promotion) = await PromotionCommandContext.Load(
@@ -17,7 +17,7 @@ public sealed class ApprovePromotionCommandHandler(
             command.PromotionId,
             cancellationToken);
 
-        promotion.Approve(actor, DateTimeOffset.UtcNow);
+        promotion.Complete(actor, DateTimeOffset.UtcNow);
         await promotions.Update(promotion, cancellationToken);
     }
 }

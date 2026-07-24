@@ -30,6 +30,11 @@ public sealed class PromotionPersistenceTests : PromotionIntegrationTest
             (await Client.PostAsync(
                 $"/promotions/{promotionId}/start-deployment",
                 null)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await Client.PostAsync(
+                $"/promotions/{promotionId}/complete",
+                null)).StatusCode);
 
         await using var connection = new NpgsqlConnection(Database.GetConnectionString());
         await connection.OpenAsync();
@@ -60,16 +65,21 @@ public sealed class PromotionPersistenceTests : PromotionIntegrationTest
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.Equal(
-            ["promotion_requested", "promotion_approved", "deployment_started"],
+            [
+                "promotion_requested",
+                "promotion_approved",
+                "deployment_started",
+                "promotion_completed"
+            ],
             reader.GetFieldValue<string[]>(0));
         Assert.Equal(
             Enumerable.Repeat(
                 Guid.Parse("01900000-0000-7000-8000-000000000001"),
-                3),
+                4),
             reader.GetFieldValue<Guid[]>(1));
         Assert.True(reader.GetBoolean(2));
         Assert.Equal(
-            ["audit", "audit,release_notes", "audit"],
+            ["audit", "audit,release_notes", "audit", "audit,notification"],
             reader.GetFieldValue<string[]>(3));
         Assert.True(reader.GetBoolean(4));
     }
