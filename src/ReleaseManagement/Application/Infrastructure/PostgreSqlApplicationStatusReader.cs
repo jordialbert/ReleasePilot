@@ -13,13 +13,13 @@ public sealed class PostgreSqlApplicationStatusReader(string connectionString)
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
-            """
+            $"""
             SELECT environment.name,
                    deployed.version_id, deployed.label, deployed.completed_at,
                    active.id, active.version_id, active.label, active.status
             FROM applications application
             CROSS JOIN (
-                VALUES ('dev', 1), ('staging', 2), ('production', 3)
+                VALUES {DeploymentEnvironmentSql.PipelineValues}
             ) environment(name, position)
             LEFT JOIN LATERAL (
                 SELECT version.id AS version_id, version.label, promotion.completed_at
@@ -33,6 +33,8 @@ public sealed class PostgreSqlApplicationStatusReader(string connectionString)
                 LIMIT 1
             ) deployed ON true
             LEFT JOIN LATERAL (
+                -- The promotions_active_target partial unique index guarantees
+                -- at most one active Promotion per Application and Environment.
                 SELECT promotion.id, version.id AS version_id,
                        version.label, promotion.status
                 FROM promotions promotion
@@ -40,7 +42,7 @@ public sealed class PostgreSqlApplicationStatusReader(string connectionString)
                   ON version.id = promotion.application_version_id
                 WHERE promotion.application_id = application.id
                   AND promotion.target_environment = environment.name
-                  AND promotion.status IN ('requested', 'approved', 'deploying')
+                  AND promotion.status IN ({PromotionStatusSql.ActiveList})
                 LIMIT 1
             ) active ON true
             WHERE application.id = $1

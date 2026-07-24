@@ -4,6 +4,16 @@ namespace ReleaseManagement.Infrastructure;
 
 internal static class PromotionStatusSql
 {
+    /// <summary>
+    /// A SQL value list of every non-terminal status,
+    /// e.g. <c>'requested', 'approved', 'deploying'</c>.
+    /// </summary>
+    public static readonly string ActiveList = string.Join(
+        ", ",
+        Enum.GetValues<PromotionStatus>()
+            .Where(status => !status.IsTerminal())
+            .Select(status => $"'{Name(status)}'"));
+
     public static string Name(PromotionStatus status) => status switch
     {
         PromotionStatus.Requested => "requested",

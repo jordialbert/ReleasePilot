@@ -15,29 +15,20 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
-            """
-            SELECT target_environment
-            FROM promotions
-            WHERE application_version_id = $1 AND status = 'completed'
-            ORDER BY CASE target_environment
-                WHEN 'production' THEN 3
-                WHEN 'staging' THEN 2
-                ELSE 1
-            END DESC
+            $"""
+            SELECT promotion.target_environment
+            FROM promotions promotion
+            JOIN (VALUES {DeploymentEnvironmentSql.PipelineValues}) environment(name, position)
+              ON environment.name = promotion.target_environment
+            WHERE promotion.application_version_id = $1 AND promotion.status = 'completed'
+            ORDER BY environment.position DESC
             LIMIT 1
             """,
             connection);
         command.Parameters.AddWithValue(id.Value);
         var value = await command.ExecuteScalarAsync(cancellationToken);
 
-        return value switch
-        {
-            null => null,
-            "dev" => DeploymentEnvironment.Dev,
-            "staging" => DeploymentEnvironment.Staging,
-            "production" => DeploymentEnvironment.Production,
-            _ => throw new InvalidOperationException("Unsupported persisted Environment.")
-        };
+        return value is string name ? DeploymentEnvironmentSql.Parse(name) : null;
     }
 
     public async Task<bool> HasActivePromotion(
@@ -48,18 +39,18 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
-            """
+            $"""
             SELECT EXISTS (
                 SELECT 1
                 FROM promotions
                 WHERE application_id = $1
                   AND target_environment = $2
-                  AND status IN ('requested', 'approved', 'deploying')
+                  AND status IN ({PromotionStatusSql.ActiveList})
             )
             """,
             connection);
         command.Parameters.AddWithValue(applicationId.Value);
-        command.Parameters.AddWithValue(targetEnvironment.ToString().ToLowerInvariant());
+        command.Parameters.AddWithValue(DeploymentEnvironmentSql.Name(targetEnvironment));
         return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
     }
 
@@ -86,7 +77,7 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
                 command.Parameters.AddWithValue(promotion.ApplicationId.Value);
                 command.Parameters.AddWithValue(promotion.ApplicationVersionId.Value);
                 command.Parameters.AddWithValue(
-                    promotion.TargetEnvironment.ToString().ToLowerInvariant());
+                    DeploymentEnvironmentSql.Name(promotion.TargetEnvironment));
                 command.Parameters.AddWithValue(promotion.RequestedBy.Value);
                 command.Parameters.AddWithValue(promotion.RequestedAt);
                 await command.ExecuteNonQueryAsync(cancellationToken);
@@ -129,13 +120,7 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
             return null;
         }
 
-        var targetEnvironment = reader.GetString(2) switch
-        {
-            "dev" => DeploymentEnvironment.Dev,
-            "staging" => DeploymentEnvironment.Staging,
-            "production" => DeploymentEnvironment.Production,
-            _ => throw new InvalidOperationException("Unsupported persisted Environment.")
-        };
+        var targetEnvironment = DeploymentEnvironmentSql.Parse(reader.GetString(2));
         var status = PromotionStatusSql.Parse(reader.GetString(3));
         DateTimeOffset? completedAt = null;
         if (!reader.IsDBNull(6))
