@@ -4,8 +4,7 @@ using ReleaseManagement.Application;
 namespace ReleasePilot.Worker;
 
 public sealed class Worker(
-    AuditEventConsumer audit,
-    NotificationEventConsumer notifications,
+    IEnumerable<EventConsumer> consumers,
     TimeProvider timeProvider,
     IOptions<HostOptions> hostOptions,
     ILogger<Worker> logger)
@@ -25,13 +24,15 @@ public sealed class Worker(
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                var auditProcessed = await audit.ProcessNext(
-                    stoppingToken,
-                    processingCancellation.Token);
-                var notificationProcessed = await notifications.ProcessNext(
-                    stoppingToken,
-                    processingCancellation.Token);
-                if (!auditProcessed && !notificationProcessed)
+                var processedAny = false;
+                foreach (var consumer in consumers)
+                {
+                    processedAny |= await consumer.ProcessNext(
+                        stoppingToken,
+                        processingCancellation.Token);
+                }
+
+                if (!processedAny)
                 {
                     await Task.Delay(
                         TimeSpan.FromMilliseconds(500),

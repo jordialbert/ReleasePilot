@@ -13,7 +13,7 @@ public sealed class AuditEventConsumerTests
             new DomainEventId(Guid.CreateVersion7()),
             new PromotionId(Guid.CreateVersion7()),
             "promotion_requested",
-            AuditEventConsumer.ConsumerName,
+            EventDelivery.AuditConsumer,
             5,
             Guid.CreateVersion7());
         var queue = new RecordingQueue(delivery, static () => { })
@@ -45,7 +45,7 @@ public sealed class AuditEventConsumerTests
             new DomainEventId(Guid.CreateVersion7()),
             new PromotionId(Guid.CreateVersion7()),
             "promotion_requested",
-            AuditEventConsumer.ConsumerName,
+            EventDelivery.AuditConsumer,
             1,
             Guid.CreateVersion7());
         var queue = new RecordingQueue(
@@ -80,7 +80,7 @@ public sealed class AuditEventConsumerTests
             new DomainEventId(Guid.CreateVersion7()),
             new PromotionId(Guid.CreateVersion7()),
             "promotion_requested",
-            AuditEventConsumer.ConsumerName,
+            EventDelivery.AuditConsumer,
             5,
             Guid.CreateVersion7());
         var queue = new RecordingQueue(delivery, static () => { })
@@ -116,7 +116,7 @@ public sealed class AuditEventConsumerTests
             new DomainEventId(Guid.CreateVersion7()),
             new PromotionId(Guid.CreateVersion7()),
             "promotion_requested",
-            AuditEventConsumer.ConsumerName,
+            EventDelivery.AuditConsumer,
             5,
             Guid.CreateVersion7());
         var queue = new RecordingQueue(delivery, static () => { })

@@ -17,11 +17,19 @@ builder.Services.AddSingleton<IEventDeliveryQueue>(
         services.GetRequiredService<ILogger<PostgreSqlEventDeliveryQueue>>()));
 builder.Services.AddSingleton<IAuditLogRepository>(
     new PostgreSqlAuditLogRepository(connectionString));
-builder.Services.AddSingleton<AuditEventConsumer>();
+builder.Services.AddSingleton<EventConsumer, AuditEventConsumer>();
 builder.Services.AddSingleton<InMemoryNotificationPort>();
 builder.Services.AddSingleton<INotificationPort>(
     services => services.GetRequiredService<InMemoryNotificationPort>());
-builder.Services.AddSingleton<NotificationEventConsumer>();
+builder.Services.AddSingleton<EventConsumer, NotificationEventConsumer>();
+builder.Services.AddSingleton<IIssueTrackerPort, InMemoryIssueTrackerPort>();
+builder.Services.AddSingleton<ILanguageModel, DeterministicLanguageModel>();
+builder.Services.AddSingleton<IReleaseNotesDraftRepository>(
+    services => new PostgreSqlReleaseNotesDraftRepository(
+        connectionString,
+        services.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton<ReleaseNotesAgent>();
+builder.Services.AddSingleton<EventConsumer, ReleaseNotesEventConsumer>();
 builder.Services.AddHostedService<Worker>();
 
 var host = builder.Build();

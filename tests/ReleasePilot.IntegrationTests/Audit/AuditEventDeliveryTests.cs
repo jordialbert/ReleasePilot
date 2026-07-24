@@ -28,20 +28,20 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
             NullLogger<PostgreSqlEventDeliveryQueue>.Instance);
 
         var claims = await Task.WhenAll(
-            queue.Claim(AuditEventConsumer.ConsumerName, CancellationToken.None),
-            queue.Claim(AuditEventConsumer.ConsumerName, CancellationToken.None));
+            queue.Claim(EventDelivery.AuditConsumer, CancellationToken.None),
+            queue.Claim(EventDelivery.AuditConsumer, CancellationToken.None));
 
         var first = Assert.Single(claims, claim => claim is not null)!;
         Assert.Single(claims, claim => claim is null);
         Assert.Null(
             await queue.Claim(
-                AuditEventConsumer.ConsumerName,
+                EventDelivery.AuditConsumer,
                 CancellationToken.None));
 
         time.UtcNow += TimeSpan.FromSeconds(60);
         var second = Assert.IsType<EventDelivery>(
             await queue.Claim(
-                AuditEventConsumer.ConsumerName,
+                EventDelivery.AuditConsumer,
                 CancellationToken.None));
         Assert.Equal(2, second.Attempt);
         Assert.NotEqual(first.ClaimToken, second.ClaimToken);
@@ -65,7 +65,7 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
             """,
             connection);
         command.Parameters.AddWithValue(second.EventId.Value);
-        command.Parameters.AddWithValue(AuditEventConsumer.ConsumerName);
+        command.Parameters.AddWithValue(EventDelivery.AuditConsumer);
         await using var reader =
             await command.ExecuteReaderAsync(CancellationToken.None);
         Assert.True(await reader.ReadAsync(CancellationToken.None));
@@ -92,7 +92,7 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
         {
             var delivery = Assert.IsType<EventDelivery>(
                 await queue.Claim(
-                    AuditEventConsumer.ConsumerName,
+                    EventDelivery.AuditConsumer,
                     CancellationToken.None));
             Assert.Equal(index + 1, delivery.Attempt);
             Assert.True(
@@ -102,14 +102,14 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
                     CancellationToken.None));
             Assert.Null(
                 await queue.Claim(
-                    AuditEventConsumer.ConsumerName,
+                    EventDelivery.AuditConsumer,
                     CancellationToken.None));
             time.UtcNow += TimeSpan.FromSeconds(retryDelays[index]);
         }
 
         var final = Assert.IsType<EventDelivery>(
             await queue.Claim(
-                AuditEventConsumer.ConsumerName,
+                EventDelivery.AuditConsumer,
                 CancellationToken.None));
         Assert.Equal(5, final.Attempt);
         Assert.True(
@@ -129,7 +129,7 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
             """,
             connection);
         command.Parameters.AddWithValue(final.EventId.Value);
-        command.Parameters.AddWithValue(AuditEventConsumer.ConsumerName);
+        command.Parameters.AddWithValue(EventDelivery.AuditConsumer);
         await using var reader =
             await command.ExecuteReaderAsync(CancellationToken.None);
         Assert.True(await reader.ReadAsync(CancellationToken.None));
@@ -157,7 +157,7 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
         {
             var delivery = Assert.IsType<EventDelivery>(
                 await queue.Claim(
-                    AuditEventConsumer.ConsumerName,
+                    EventDelivery.AuditConsumer,
                     CancellationToken.None));
             Assert.True(
                 await queue.Fail(
@@ -169,14 +169,14 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
 
         var fifth = Assert.IsType<EventDelivery>(
             await queue.Claim(
-                AuditEventConsumer.ConsumerName,
+                EventDelivery.AuditConsumer,
                 CancellationToken.None));
         Assert.Equal(5, fifth.Attempt);
         time.UtcNow += TimeSpan.FromSeconds(60);
 
         Assert.Null(
             await queue.Claim(
-                AuditEventConsumer.ConsumerName,
+                EventDelivery.AuditConsumer,
                 CancellationToken.None));
 
         await using var connection = new NpgsqlConnection(Database.GetConnectionString());
@@ -189,7 +189,7 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
             """,
             connection);
         command.Parameters.AddWithValue(fifth.EventId.Value);
-        command.Parameters.AddWithValue(AuditEventConsumer.ConsumerName);
+        command.Parameters.AddWithValue(EventDelivery.AuditConsumer);
         await using var reader =
             await command.ExecuteReaderAsync(CancellationToken.None);
         Assert.True(await reader.ReadAsync(CancellationToken.None));
@@ -253,7 +253,7 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
             FROM audit_log
             """,
             connection);
-        command.Parameters.AddWithValue(AuditEventConsumer.ConsumerName);
+        command.Parameters.AddWithValue(EventDelivery.AuditConsumer);
         command.Parameters.AddWithValue(AuditTime);
         await using var reader =
             await command.ExecuteReaderAsync(CancellationToken.None);
