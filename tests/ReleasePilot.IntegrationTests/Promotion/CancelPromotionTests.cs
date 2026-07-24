@@ -184,7 +184,10 @@ public sealed class CancelPromotionTests : PromotionIntegrationTest
         var cancel = client.PostAsync($"/promotions/{id}/cancel", null);
 
         var waitingForLock = false;
-        while (!cancel.IsCompleted && !waitingForLock)
+        var waitDeadline = DateTimeOffset.UtcNow.AddSeconds(10);
+        while (!cancel.IsCompleted
+            && !waitingForLock
+            && DateTimeOffset.UtcNow < waitDeadline)
         {
             await using var connection = new NpgsqlConnection(Database.GetConnectionString());
             await connection.OpenAsync();
@@ -192,12 +195,16 @@ public sealed class CancelPromotionTests : PromotionIntegrationTest
                 """
                 SELECT EXISTS (
                     SELECT 1
-                    FROM pg_locks
-                    WHERE locktype = 'advisory' AND NOT granted
+                    FROM pg_locks waiting
+                    JOIN pg_stat_activity activity ON activity.pid = waiting.pid
+                    WHERE waiting.locktype = 'advisory'
+                      AND NOT waiting.granted
+                      AND activity.query LIKE '%pg_advisory_xact_lock%'
                 )
                 """,
                 connection);
             waitingForLock = (bool)(await command.ExecuteScalarAsync())!;
+            await Task.Delay(10);
         }
 
         try
