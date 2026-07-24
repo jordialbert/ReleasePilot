@@ -139,6 +139,65 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
     }
 
     [Fact]
+    public async Task FailsAnExpiredFifthClaimWithoutClaimingAgain()
+    {
+        UseApprover();
+        await CreatePromotion(VersionId, "dev");
+        var time = new AdjustableTimeProvider(AuditTime);
+        var queue = new PostgreSqlEventDeliveryQueue(
+            Database.GetConnectionString(),
+            time);
+        int[] retryDelays = [5, 10, 20, 30];
+
+        foreach (var retryDelay in retryDelays)
+        {
+            var delivery = Assert.IsType<EventDelivery>(
+                await queue.Claim(
+                    AuditEventConsumer.ConsumerName,
+                    CancellationToken.None));
+            Assert.True(
+                await queue.Fail(
+                    delivery,
+                    $"attempt {delivery.Attempt}",
+                    CancellationToken.None));
+            time.UtcNow += TimeSpan.FromSeconds(retryDelay);
+        }
+
+        var fifth = Assert.IsType<EventDelivery>(
+            await queue.Claim(
+                AuditEventConsumer.ConsumerName,
+                CancellationToken.None));
+        Assert.Equal(5, fifth.Attempt);
+        time.UtcNow += TimeSpan.FromSeconds(60);
+
+        Assert.Null(
+            await queue.Claim(
+                AuditEventConsumer.ConsumerName,
+                CancellationToken.None));
+
+        await using var connection = new NpgsqlConnection(Database.GetConnectionString());
+        await connection.OpenAsync(CancellationToken.None);
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT status, attempts, finished_at, last_error
+            FROM event_deliveries
+            WHERE event_id = $1 AND consumer = $2
+            """,
+            connection);
+        command.Parameters.AddWithValue(fifth.EventId.Value);
+        command.Parameters.AddWithValue(AuditEventConsumer.ConsumerName);
+        await using var reader =
+            await command.ExecuteReaderAsync(CancellationToken.None);
+        Assert.True(await reader.ReadAsync(CancellationToken.None));
+        Assert.Equal("failed", reader.GetString(0));
+        Assert.Equal(5, reader.GetInt32(1));
+        Assert.Equal(time.UtcNow, reader.GetFieldValue<DateTimeOffset>(2));
+        Assert.Equal(
+            "Delivery lease expired after maximum attempts.",
+            reader.GetString(3));
+    }
+
+    [Fact]
     public async Task AuditsEveryEventAndCompletesEachDelivery()
     {
         UseApprover();

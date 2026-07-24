@@ -28,6 +28,35 @@ public sealed class PostgreSqlEventDeliveryQueue(
         var claimToken = Guid.CreateVersion7();
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
+        await using (var expiredCommand = new NpgsqlCommand(
+            """
+            WITH expired AS (
+                SELECT event_id, consumer
+                FROM event_deliveries
+                WHERE consumer = $1
+                  AND status = 'pending'
+                  AND attempts >= $3
+                  AND (locked_until IS NULL OR locked_until <= $2)
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE event_deliveries delivery
+            SET status = 'failed',
+                locked_until = NULL,
+                lock_token = NULL,
+                finished_at = $2,
+                last_error = 'Delivery lease expired after maximum attempts.'
+            FROM expired
+            WHERE delivery.event_id = expired.event_id
+              AND delivery.consumer = expired.consumer
+            """,
+            connection))
+        {
+            expiredCommand.Parameters.AddWithValue(consumer);
+            expiredCommand.Parameters.AddWithValue(now);
+            expiredCommand.Parameters.AddWithValue(MaxAttempts);
+            await expiredCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         await using var command = new NpgsqlCommand(
             """
             WITH candidate AS (
@@ -37,6 +66,7 @@ public sealed class PostgreSqlEventDeliveryQueue(
                   AND status = 'pending'
                   AND available_at <= $2
                   AND (locked_until IS NULL OR locked_until <= $2)
+                  AND attempts < $5
                 ORDER BY available_at, event_id
                 FOR UPDATE SKIP LOCKED
                 LIMIT 1
@@ -55,6 +85,7 @@ public sealed class PostgreSqlEventDeliveryQueue(
         command.Parameters.AddWithValue(now);
         command.Parameters.AddWithValue(now + LeaseDuration);
         command.Parameters.AddWithValue(claimToken);
+        command.Parameters.AddWithValue(MaxAttempts);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
