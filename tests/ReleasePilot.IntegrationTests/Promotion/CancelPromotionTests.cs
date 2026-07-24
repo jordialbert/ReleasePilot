@@ -52,6 +52,20 @@ public sealed class CancelPromotionTests : PromotionIntegrationTest
             "promotion_cancelled",
             details.GetProperty("history")[eventIndex].GetProperty("type").GetString());
         Assert.Equal(historyLength, details.GetProperty("history").GetArrayLength());
+        await using var connection = new NpgsqlConnection(Database.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT array_agg(delivery.consumer ORDER BY delivery.consumer)
+            FROM event_deliveries delivery
+            JOIN domain_events event ON event.id = delivery.event_id
+            WHERE event.promotion_id = $1 AND event.type = 'promotion_cancelled'
+            """,
+            connection);
+        command.Parameters.AddWithValue(Guid.Parse(id!));
+        Assert.Equal(
+            ["audit", "notification"],
+            (string[])(await command.ExecuteScalarAsync())!);
         var repeatedCancellation = await Client.PostAsync($"/promotions/{id}/cancel", null);
         Assert.Equal(HttpStatusCode.Conflict, repeatedCancellation.StatusCode);
         Assert.Equal(

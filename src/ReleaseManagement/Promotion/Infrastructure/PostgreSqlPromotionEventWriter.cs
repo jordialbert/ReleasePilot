@@ -41,7 +41,7 @@ internal static class PostgreSqlPromotionEventWriter
             PromotionCancelled => (
                 Type: "promotion_cancelled",
                 Payload: "{}",
-                Consumers: new[] { "audit" }),
+                Consumers: new[] { "audit", "notification" }),
             _ => throw new UnreachableException()
         };
         await using (var command = new NpgsqlCommand(
