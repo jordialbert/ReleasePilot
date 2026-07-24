@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using Npgsql;
 using ReleaseManagement.Application;
@@ -137,16 +136,7 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
             "production" => DeploymentEnvironment.Production,
             _ => throw new InvalidOperationException("Unsupported persisted Environment.")
         };
-        var status = reader.GetString(3) switch
-        {
-            "requested" => PromotionStatus.Requested,
-            "approved" => PromotionStatus.Approved,
-            "deploying" => PromotionStatus.Deploying,
-            "completed" => PromotionStatus.Completed,
-            "cancelled" => PromotionStatus.Cancelled,
-            "rolled_back" => PromotionStatus.RolledBack,
-            _ => throw new InvalidOperationException("Unsupported persisted Promotion status.")
-        };
+        var status = PromotionStatusSql.Parse(reader.GetString(3));
         DateTimeOffset? completedAt = null;
         if (!reader.IsDBNull(6))
         {
@@ -171,13 +161,6 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
             throw new InvalidPromotionTransition();
         }
 
-        var (from, to) = domainEvent switch
-        {
-            PromotionApproved => ("requested", "approved"),
-            DeploymentStarted => ("approved", "deploying"),
-            PromotionCompleted => ("deploying", "completed"),
-            _ => throw new UnreachableException()
-        };
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -191,16 +174,9 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
             transaction))
         {
             command.Parameters.AddWithValue(promotion.Id.Value);
-            command.Parameters.AddWithValue(to);
-            command.Parameters.AddWithValue(from);
-            if (promotion.CompletedAt is null)
-            {
-                command.Parameters.AddWithValue(DBNull.Value);
-            }
-            else
-            {
-                command.Parameters.AddWithValue(promotion.CompletedAt.Value);
-            }
+            command.Parameters.AddWithValue(PromotionStatusSql.Name(promotion.Status));
+            command.Parameters.AddWithValue(PromotionStatusSql.Name(promotion.CommittedStatus));
+            command.Parameters.AddWithValue((object?)promotion.CompletedAt ?? DBNull.Value);
             if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
             {
                 throw new ConcurrentPromotionUpdate();
