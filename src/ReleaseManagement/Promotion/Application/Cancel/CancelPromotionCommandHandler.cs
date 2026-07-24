@@ -10,17 +10,19 @@ public sealed class CancelPromotionCommandHandler(
         CancelPromotionCommand command,
         CancellationToken cancellationToken)
     {
-        await using var transitionLock = await promotions.AcquireTransitionLock(
+        var actor = await users.Find(new UserId(command.ActorId), cancellationToken)
+            ?? throw new UnknownActor();
+        var found = await promotions.Transition(
             new PromotionId(command.PromotionId),
+            (promotion, _) =>
+            {
+                promotion.Cancel(actor, DateTimeOffset.UtcNow);
+                return Task.CompletedTask;
+            },
             cancellationToken);
-        var (actor, promotion) = await PromotionCommandContext.Load(
-            users,
-            promotions,
-            command.ActorId,
-            command.PromotionId,
-            cancellationToken);
-
-        promotion.Cancel(actor, DateTimeOffset.UtcNow);
-        await promotions.Update(promotion, cancellationToken);
+        if (!found)
+        {
+            throw new ResourceNotFound("promotion");
+        }
     }
 }

@@ -1,8 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.Extensions.DependencyInjection;
-using ReleaseManagement.Domain;
 
 namespace ReleasePilot.IntegrationTests;
 
@@ -88,30 +86,6 @@ public sealed class CompletePromotionTests : PromotionIntegrationTest
     }
 
     [Fact]
-    public async Task RejectsAStalePromotionSnapshotWithAControlledConflict()
-    {
-        UseApprover();
-        var id = await StartDeploying(ConcurrencyVersionId, "dev");
-
-        var repository = Application.Services.GetRequiredService<IPromotionRepository>();
-        var promotionId = new PromotionId(Guid.Parse(id));
-        var first = (await repository.Find(promotionId, CancellationToken.None))!;
-        var stale = (await repository.Find(promotionId, CancellationToken.None))!;
-        var actor = new Actor(
-            new UserId(Guid.Parse(ApproverId)),
-            "Alex Approver",
-            UserRole.Approver);
-        first.Complete(actor, DateTimeOffset.UtcNow);
-        stale.Complete(actor, DateTimeOffset.UtcNow);
-
-        await repository.Update(first, CancellationToken.None);
-        var conflict = await Assert.ThrowsAsync<ConcurrentPromotionUpdate>(
-            () => repository.Update(stale, CancellationToken.None));
-
-        Assert.Equal("concurrency_conflict", conflict.Code);
-    }
-
-    [Fact]
     public async Task ReturnsAControlledConflictForConcurrentCompletions()
     {
         UseApprover();
@@ -126,9 +100,9 @@ public sealed class CompletePromotionTests : PromotionIntegrationTest
             responses,
             response => response.StatusCode == HttpStatusCode.Conflict);
         var problem = await conflict.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Contains(
-            problem.GetProperty("code").GetString(),
-            new[] { "concurrency_conflict", "terminal_promotion_is_immutable" });
+        Assert.Equal(
+            "terminal_promotion_is_immutable",
+            problem.GetProperty("code").GetString());
     }
 
     private void UseApprover() =>

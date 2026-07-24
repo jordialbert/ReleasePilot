@@ -197,9 +197,9 @@ public sealed class CancelPromotionTests : PromotionIntegrationTest
                     SELECT 1
                     FROM pg_locks waiting
                     JOIN pg_stat_activity activity ON activity.pid = waiting.pid
-                    WHERE waiting.locktype = 'advisory'
+                    WHERE waiting.locktype = 'transactionid'
                       AND NOT waiting.granted
-                      AND activity.query LIKE '%pg_advisory_xact_lock%'
+                      AND activity.query LIKE '%FROM promotions%FOR UPDATE%'
                 )
                 """,
                 connection);

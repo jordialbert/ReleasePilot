@@ -17,7 +17,6 @@ public sealed class Promotion
         RequestedBy = requestedBy;
         RequestedAt = requestedAt;
         Status = PromotionStatus.Requested;
-        CommittedStatus = PromotionStatus.Requested;
         UncommittedEvent = new PromotionRequested(
             new DomainEventId(Guid.CreateVersion7()),
             id,
@@ -43,7 +42,6 @@ public sealed class Promotion
         ApplicationVersionId = applicationVersionId;
         TargetEnvironment = targetEnvironment;
         Status = status;
-        CommittedStatus = status;
         RequestedBy = requestedBy;
         RequestedAt = requestedAt;
         CompletedAt = completedAt;
@@ -54,7 +52,6 @@ public sealed class Promotion
     public ApplicationVersionId ApplicationVersionId { get; }
     public DeploymentEnvironment TargetEnvironment { get; }
     public PromotionStatus Status { get; private set; }
-    public PromotionStatus CommittedStatus { get; }
     public UserId RequestedBy { get; }
     public DateTimeOffset RequestedAt { get; }
     public DateTimeOffset? CompletedAt { get; private set; }

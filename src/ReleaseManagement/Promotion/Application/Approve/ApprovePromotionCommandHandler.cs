@@ -10,14 +10,19 @@ public sealed class ApprovePromotionCommandHandler(
         ApprovePromotionCommand command,
         CancellationToken cancellationToken)
     {
-        var (actor, promotion) = await PromotionCommandContext.Load(
-            users,
-            promotions,
-            command.ActorId,
-            command.PromotionId,
+        var actor = await users.Find(new UserId(command.ActorId), cancellationToken)
+            ?? throw new UnknownActor();
+        var found = await promotions.Transition(
+            new PromotionId(command.PromotionId),
+            (promotion, _) =>
+            {
+                promotion.Approve(actor, DateTimeOffset.UtcNow);
+                return Task.CompletedTask;
+            },
             cancellationToken);
-
-        promotion.Approve(actor, DateTimeOffset.UtcNow);
-        await promotions.Update(promotion, cancellationToken);
+        if (!found)
+        {
+            throw new ResourceNotFound("promotion");
+        }
     }
 }
