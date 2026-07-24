@@ -7,9 +7,13 @@ public sealed class AuditEventConsumer(
 {
     public const string ConsumerName = "audit";
 
-    public async Task<bool> ProcessNext(CancellationToken cancellationToken)
+    public async Task<bool> ProcessNext(
+        CancellationToken claimCancellationToken,
+        CancellationToken processingCancellationToken)
     {
-        var delivery = await deliveries.Claim(ConsumerName, cancellationToken);
+        var delivery = await deliveries.Claim(
+            ConsumerName,
+            claimCancellationToken);
         if (delivery is null)
         {
             return false;
@@ -20,18 +24,23 @@ public sealed class AuditEventConsumer(
             await auditLog.Add(
                 delivery.EventId,
                 timeProvider.GetUtcNow(),
-                cancellationToken);
-            await deliveries.Complete(delivery, cancellationToken);
+                processingCancellationToken);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException)
+            when (processingCancellationToken.IsCancellationRequested)
         {
             throw;
         }
         catch (Exception exception)
         {
-            await deliveries.Fail(delivery, exception.ToString(), cancellationToken);
+            await deliveries.Fail(
+                delivery,
+                exception.ToString(),
+                processingCancellationToken);
+            return true;
         }
 
+        await deliveries.Complete(delivery, processingCancellationToken);
         return true;
     }
 }

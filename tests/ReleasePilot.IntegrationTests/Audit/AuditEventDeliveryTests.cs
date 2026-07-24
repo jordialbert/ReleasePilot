@@ -214,7 +214,9 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
             new PostgreSqlAuditLogRepository(Database.GetConnectionString());
         var consumer = new AuditEventConsumer(queue, auditLog, time);
 
-        while (await consumer.ProcessNext(CancellationToken.None))
+        while (await consumer.ProcessNext(
+                   CancellationToken.None,
+                   CancellationToken.None))
         {
         }
 
@@ -283,7 +285,10 @@ public sealed class AuditEventDeliveryTests : PromotionIntegrationTest
         var auditLog =
             new PostgreSqlAuditLogRepository(Database.GetConnectionString());
         var consumer = new AuditEventConsumer(queue, auditLog, time);
-        Assert.True(await consumer.ProcessNext(CancellationToken.None));
+        Assert.True(
+            await consumer.ProcessNext(
+                CancellationToken.None,
+                CancellationToken.None));
 
         await using var connection = new NpgsqlConnection(Database.GetConnectionString());
         await connection.OpenAsync(CancellationToken.None);
