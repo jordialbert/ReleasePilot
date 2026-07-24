@@ -38,6 +38,10 @@ internal static class PostgreSqlPromotionEventWriter
                 Type: "promotion_completed",
                 Payload: "{}",
                 Consumers: new[] { "audit", "notification" }),
+            PromotionRolledBack => (
+                Type: "promotion_rolled_back",
+                Payload: "{}",
+                Consumers: new[] { "audit", "notification" }),
             PromotionCancelled => (
                 Type: "promotion_cancelled",
                 Payload: "{}",

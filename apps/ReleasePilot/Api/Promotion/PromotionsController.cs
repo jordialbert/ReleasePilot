@@ -11,6 +11,7 @@ public sealed class PromotionsController(
     ApprovePromotionCommandHandler approvePromotion,
     StartDeploymentCommandHandler startDeployment,
     CompletePromotionCommandHandler completePromotion,
+    RollbackPromotionCommandHandler rollbackPromotion,
     CancelPromotionCommandHandler cancelPromotion,
     GetPromotionDetailsQueryHandler getPromotionDetails) : ControllerBase
 {
@@ -76,6 +77,21 @@ public sealed class PromotionsController(
 
         await completePromotion.Handle(
             new CompletePromotionCommand(promotionId, actorId),
+            cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("{id}/rollback")]
+    public async Task<IActionResult> RollbackPromotion(
+        string id,
+        [FromHeader(Name = "X-User-Id")] string? actorHeader,
+        CancellationToken cancellationToken)
+    {
+        var actorId = RequiredActor.Parse(actorHeader);
+        var promotionId = ParsePromotionId(id);
+
+        await rollbackPromotion.Handle(
+            new RollbackPromotionCommand(promotionId, actorId),
             cancellationToken);
         return NoContent();
     }
