@@ -11,6 +11,8 @@ public sealed class AuditEventConsumerTests
     {
         var delivery = new EventDelivery(
             new DomainEventId(Guid.CreateVersion7()),
+            new PromotionId(Guid.CreateVersion7()),
+            "promotion_requested",
             AuditEventConsumer.ConsumerName,
             5,
             Guid.CreateVersion7());
@@ -41,6 +43,8 @@ public sealed class AuditEventConsumerTests
         using var processingCancellation = new CancellationTokenSource();
         var delivery = new EventDelivery(
             new DomainEventId(Guid.CreateVersion7()),
+            new PromotionId(Guid.CreateVersion7()),
+            "promotion_requested",
             AuditEventConsumer.ConsumerName,
             1,
             Guid.CreateVersion7());
@@ -74,6 +78,8 @@ public sealed class AuditEventConsumerTests
         var exception = new InvalidOperationException("Audit insert failed");
         var delivery = new EventDelivery(
             new DomainEventId(Guid.CreateVersion7()),
+            new PromotionId(Guid.CreateVersion7()),
+            "promotion_requested",
             AuditEventConsumer.ConsumerName,
             5,
             Guid.CreateVersion7());
@@ -108,6 +114,8 @@ public sealed class AuditEventConsumerTests
     {
         var delivery = new EventDelivery(
             new DomainEventId(Guid.CreateVersion7()),
+            new PromotionId(Guid.CreateVersion7()),
+            "promotion_requested",
             AuditEventConsumer.ConsumerName,
             5,
             Guid.CreateVersion7());
