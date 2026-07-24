@@ -108,22 +108,13 @@ public sealed class Promotion
 
     public void Approve(Actor actor, DateTimeOffset approvedAt)
     {
-        if (Status is PromotionStatus.Completed
-            or PromotionStatus.Cancelled
-            or PromotionStatus.RolledBack)
-        {
-            throw new TerminalPromotionIsImmutable();
-        }
-
+        EnsureNotTerminal();
         if (actor.Role != UserRole.Approver)
         {
             throw new OnlyApproverCanApprove();
         }
 
-        if (Status != PromotionStatus.Requested)
-        {
-            throw new InvalidPromotionTransition();
-        }
+        EnsureStatus(PromotionStatus.Requested);
 
         Status = PromotionStatus.Approved;
         UncommittedEvent = new PromotionApproved(
@@ -135,17 +126,8 @@ public sealed class Promotion
 
     public void StartDeployment(Actor actor, DateTimeOffset startedAt)
     {
-        if (Status is PromotionStatus.Completed
-            or PromotionStatus.Cancelled
-            or PromotionStatus.RolledBack)
-        {
-            throw new TerminalPromotionIsImmutable();
-        }
-
-        if (Status != PromotionStatus.Approved)
-        {
-            throw new InvalidPromotionTransition();
-        }
+        EnsureNotTerminal();
+        EnsureStatus(PromotionStatus.Approved);
 
         Status = PromotionStatus.Deploying;
         UncommittedEvent = new DeploymentStarted(
@@ -157,17 +139,8 @@ public sealed class Promotion
 
     public void Complete(Actor actor, DateTimeOffset completedAt)
     {
-        if (Status is PromotionStatus.Completed
-            or PromotionStatus.Cancelled
-            or PromotionStatus.RolledBack)
-        {
-            throw new TerminalPromotionIsImmutable();
-        }
-
-        if (Status != PromotionStatus.Deploying)
-        {
-            throw new InvalidPromotionTransition();
-        }
+        EnsureNotTerminal();
+        EnsureStatus(PromotionStatus.Deploying);
 
         Status = PromotionStatus.Completed;
         CompletedAt = completedAt;
@@ -176,5 +149,21 @@ public sealed class Promotion
             Id,
             completedAt,
             actor.Id);
+    }
+
+    private void EnsureNotTerminal()
+    {
+        if (Status.IsTerminal())
+        {
+            throw new TerminalPromotionIsImmutable();
+        }
+    }
+
+    private void EnsureStatus(PromotionStatus expected)
+    {
+        if (Status != expected)
+        {
+            throw new InvalidPromotionTransition();
+        }
     }
 }
