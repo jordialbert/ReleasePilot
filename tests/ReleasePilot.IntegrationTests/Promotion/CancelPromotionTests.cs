@@ -1,6 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Npgsql;
+using ReleaseManagement.Domain;
 
 namespace ReleasePilot.IntegrationTests;
 
@@ -134,5 +139,81 @@ public sealed class CancelPromotionTests : PromotionIntegrationTest
             history.GetProperty("items").EnumerateArray(),
             item => item.GetProperty("id").GetString() == retryId
                 && item.GetProperty("status").GetString() == "requested");
+    }
+
+    [Fact]
+    public async Task SerializesCancellationAgainstDeploymentStart()
+    {
+        var deployment = new BlockingDeploymentPort();
+        await using var application = Application.WithWebHostBuilder(
+            builder => builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IDeploymentPort>();
+                services.AddSingleton<IDeploymentPort>(deployment);
+            }));
+        using var client = application.CreateClient();
+        client.DefaultRequestHeaders.Add(
+            "X-User-Id",
+            "01900000-0000-7000-8000-000000000001");
+        var createResponse = await client.PostAsJsonAsync(
+            "/promotions",
+            new { applicationVersionId = VersionId, targetEnvironment = "dev" });
+        var id = (await createResponse.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id")
+            .GetString();
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await client.PostAsync($"/promotions/{id}/approve", null)).StatusCode);
+
+        var start = client.PostAsync($"/promotions/{id}/start-deployment", null);
+        await deployment.Started.Task;
+        var cancel = client.PostAsync($"/promotions/{id}/cancel", null);
+
+        var waitingForLock = false;
+        while (!cancel.IsCompleted && !waitingForLock)
+        {
+            await using var connection = new NpgsqlConnection(Database.GetConnectionString());
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_locks
+                    WHERE locktype = 'advisory' AND NOT granted
+                )
+                """,
+                connection);
+            waitingForLock = (bool)(await command.ExecuteScalarAsync())!;
+        }
+
+        try
+        {
+            Assert.True(waitingForLock);
+        }
+        finally
+        {
+            deployment.Continue.SetResult();
+        }
+
+        Assert.Equal(HttpStatusCode.NoContent, (await start).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await cancel).StatusCode);
+        var details = await client.GetFromJsonAsync<JsonElement>($"/promotions/{id}");
+        Assert.Equal("deploying", details.GetProperty("status").GetString());
+    }
+
+    private sealed class BlockingDeploymentPort : IDeploymentPort
+    {
+        public TaskCompletionSource Started { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Continue { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task Start(
+            PromotionId promotionId,
+            CancellationToken cancellationToken)
+        {
+            Started.SetResult();
+            await Continue.Task.WaitAsync(cancellationToken);
+        }
     }
 }

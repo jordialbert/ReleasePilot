@@ -54,6 +54,30 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
         return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
     }
 
+    public async Task<IAsyncDisposable> AcquireTransitionLock(
+        PromotionId id,
+        CancellationToken cancellationToken)
+    {
+        var connection = new NpgsqlConnection(connectionString);
+        try
+        {
+            await connection.OpenAsync(cancellationToken);
+            var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(
+                "SELECT pg_advisory_xact_lock(hashtextextended(CAST($1 AS text), 0))",
+                connection,
+                transaction);
+            command.Parameters.AddWithValue(id.Value);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            return connection;
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
+    }
+
     public async Task Add(Promotion promotion, CancellationToken cancellationToken)
     {
         await using var connection = new NpgsqlConnection(connectionString);

@@ -10,6 +10,9 @@ public sealed class CancelPromotionCommandHandler(
         CancelPromotionCommand command,
         CancellationToken cancellationToken)
     {
+        await using var transitionLock = await promotions.AcquireTransitionLock(
+            new PromotionId(command.PromotionId),
+            cancellationToken);
         var (actor, promotion) = await PromotionCommandContext.Load(
             users,
             promotions,
