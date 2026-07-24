@@ -28,9 +28,10 @@ internal static class PostgreSqlPromotionEventWriter
                 }),
                 Consumers: new[] { EventDelivery.AuditConsumer }),
             PromotionApproved => (
-                Type: "promotion_approved",
+                Type: EventDelivery.PromotionApprovedEventType,
                 Payload: "{}",
-                Consumers: new[] { EventDelivery.AuditConsumer, "release_notes" }),
+                Consumers: new[] {
+                    EventDelivery.AuditConsumer, EventDelivery.ReleaseNotesConsumer }),
             DeploymentStarted => (
                 Type: "deployment_started",
                 Payload: "{}",
@@ -38,15 +39,18 @@ internal static class PostgreSqlPromotionEventWriter
             PromotionCompleted => (
                 Type: "promotion_completed",
                 Payload: "{}",
-                Consumers: new[] { EventDelivery.AuditConsumer, "notification" }),
+                Consumers: new[] {
+                    EventDelivery.AuditConsumer, EventDelivery.NotificationConsumer }),
             PromotionRolledBack => (
                 Type: "promotion_rolled_back",
                 Payload: "{}",
-                Consumers: new[] { EventDelivery.AuditConsumer, "notification" }),
+                Consumers: new[] {
+                    EventDelivery.AuditConsumer, EventDelivery.NotificationConsumer }),
             PromotionCancelled => (
                 Type: "promotion_cancelled",
                 Payload: "{}",
-                Consumers: new[] { EventDelivery.AuditConsumer, "notification" }),
+                Consumers: new[] {
+                    EventDelivery.AuditConsumer, EventDelivery.NotificationConsumer }),
             _ => throw new UnreachableException()
         };
         await using (var command = new NpgsqlCommand(
