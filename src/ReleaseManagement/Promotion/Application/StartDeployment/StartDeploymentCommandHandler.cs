@@ -11,23 +11,28 @@ public sealed class StartDeploymentCommandHandler(
         StartDeploymentCommand command,
         CancellationToken cancellationToken)
     {
-        var (actor, promotion) = await PromotionCommandContext.Load(
-            users,
-            promotions,
-            command.ActorId,
-            command.PromotionId,
+        var actor = await users.Find(new UserId(command.ActorId), cancellationToken)
+            ?? throw new UnknownActor();
+        var found = await promotions.Transition(
+            new PromotionId(command.PromotionId),
+            async (promotion, transitionCancellationToken) =>
+            {
+                promotion.StartDeployment(actor, DateTimeOffset.UtcNow);
+                try
+                {
+                    await deployment.Start(
+                        promotion.Id,
+                        transitionCancellationToken);
+                }
+                catch (Exception) when (!transitionCancellationToken.IsCancellationRequested)
+                {
+                    throw new DeploymentUnavailable();
+                }
+            },
             cancellationToken);
-
-        promotion.StartDeployment(actor, DateTimeOffset.UtcNow);
-        try
+        if (!found)
         {
-            await deployment.Start(promotion.Id, cancellationToken);
+            throw new ResourceNotFound("promotion");
         }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new DeploymentUnavailable();
-        }
-
-        await promotions.Update(promotion, cancellationToken);
     }
 }

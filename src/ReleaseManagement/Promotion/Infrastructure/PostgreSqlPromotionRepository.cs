@@ -54,6 +54,76 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
         return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
     }
 
+    public async Task<bool> Transition(
+        PromotionId id,
+        Func<Promotion, CancellationToken, Task> change,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        Promotion promotion;
+        await using (var command = new NpgsqlCommand(
+            """
+            SELECT application_id, application_version_id, target_environment,
+                   status, requested_by, requested_at, completed_at
+            FROM promotions
+            WHERE id = $1
+            FOR UPDATE
+            """,
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue(id.Value);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return false;
+            }
+
+            DateTimeOffset? completedAt = null;
+            if (!reader.IsDBNull(6))
+            {
+                completedAt = reader.GetFieldValue<DateTimeOffset>(6);
+            }
+
+            promotion = new Promotion(
+                id,
+                new ReleaseManagement.Domain.ApplicationId(reader.GetGuid(0)),
+                new ApplicationVersionId(reader.GetGuid(1)),
+                DeploymentEnvironmentSql.Parse(reader.GetString(2)),
+                PromotionStatusSql.Parse(reader.GetString(3)),
+                new UserId(reader.GetGuid(4)),
+                reader.GetFieldValue<DateTimeOffset>(5),
+                completedAt);
+        }
+
+        await change(promotion, cancellationToken);
+
+        await using (var command = new NpgsqlCommand(
+            """
+            UPDATE promotions
+            SET status = $2, completed_at = $3
+            WHERE id = $1
+            """,
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue(promotion.Id.Value);
+            command.Parameters.AddWithValue(PromotionStatusSql.Name(promotion.Status));
+            command.Parameters.AddWithValue((object?)promotion.CompletedAt ?? DBNull.Value);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await PostgreSqlPromotionEventWriter.Write(
+            promotion.UncommittedEvent!,
+            connection,
+            transaction,
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
     public async Task Add(Promotion promotion, CancellationToken cancellationToken)
     {
         await using var connection = new NpgsqlConnection(connectionString);
@@ -96,85 +166,6 @@ public sealed class PostgreSqlPromotionRepository(string connectionString)
         {
             throw new ActivePromotionAlreadyExists();
         }
-    }
-
-    public async Task<Promotion?> Find(
-        PromotionId id,
-        CancellationToken cancellationToken)
-    {
-        await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(
-            """
-            SELECT application_id, application_version_id, target_environment,
-                   status, requested_by, requested_at, completed_at
-            FROM promotions
-            WHERE id = $1
-            """,
-            connection);
-        command.Parameters.AddWithValue(id.Value);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-        if (!await reader.ReadAsync(cancellationToken))
-        {
-            return null;
-        }
-
-        var targetEnvironment = DeploymentEnvironmentSql.Parse(reader.GetString(2));
-        var status = PromotionStatusSql.Parse(reader.GetString(3));
-        DateTimeOffset? completedAt = null;
-        if (!reader.IsDBNull(6))
-        {
-            completedAt = reader.GetFieldValue<DateTimeOffset>(6);
-        }
-
-        return new Promotion(
-            id,
-            new ReleaseManagement.Domain.ApplicationId(reader.GetGuid(0)),
-            new ApplicationVersionId(reader.GetGuid(1)),
-            targetEnvironment,
-            status,
-            new UserId(reader.GetGuid(4)),
-            reader.GetFieldValue<DateTimeOffset>(5),
-            completedAt);
-    }
-
-    public async Task Update(Promotion promotion, CancellationToken cancellationToken)
-    {
-        if (promotion.UncommittedEvent is not { } domainEvent)
-        {
-            throw new InvalidPromotionTransition();
-        }
-
-        await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        await using (var command = new NpgsqlCommand(
-            """
-            UPDATE promotions
-            SET status = $2, completed_at = $4
-            WHERE id = $1 AND status = $3
-            """,
-            connection,
-            transaction))
-        {
-            command.Parameters.AddWithValue(promotion.Id.Value);
-            command.Parameters.AddWithValue(PromotionStatusSql.Name(promotion.Status));
-            command.Parameters.AddWithValue(PromotionStatusSql.Name(promotion.CommittedStatus));
-            command.Parameters.AddWithValue((object?)promotion.CompletedAt ?? DBNull.Value);
-            if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
-            {
-                throw new ConcurrentPromotionUpdate();
-            }
-        }
-
-        await PostgreSqlPromotionEventWriter.Write(
-            domainEvent,
-            connection,
-            transaction,
-            cancellationToken);
-
-        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task<PromotionDetailsResponse?> Find(
